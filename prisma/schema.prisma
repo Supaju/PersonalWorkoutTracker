@@ -1,0 +1,91 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model UserProfile {
+  id        String   @id @default(cuid())
+  name      String?
+  age       Int
+  gender    String
+  heightIn  Float
+  weightLbs Float
+  goals     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Equipment {
+  id       String @id @default(cuid())
+  name     String
+  category String
+}
+
+model FoodItem {
+  id       String  @id @default(cuid())
+  name     String
+  calories Float
+  protein  Float
+  carbs    Float
+  fat      Float
+  serving  String?
+}
+
+model MealPlan {
+  id    String @id @default(cuid())
+  date  String @unique
+  meals String
+}
+
+model AIReview {
+  id         String   @id @default(cuid())
+  createdAt  DateTime @default(now())
+  reviewText String
+  category   String
+}
+
+model CycleState {
+  id              String   @id @default("singleton")
+  currentTemplate String   @default("upper_b")
+  sessionCount    Int      @default(0)
+  updatedAt       DateTime @updatedAt
+}
+
+model WorkoutSession {
+  id          String            @id @default(cuid())
+  date        String
+  template    String
+  phase       String            @default("planned")
+  durationMin Int?
+  notes       String?
+  exercises   SessionExercise[]
+  createdAt   DateTime          @default(now())
+}
+
+model SessionExercise {
+  id           String         @id @default(cuid())
+  sessionId    String
+  session      WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  slot         String
+  name         String
+  muscleGroups String
+  targetSets   Int
+  targetReps   String
+  targetWeight Float?
+  orderIndex   Int
+  aiNotes      String?
+  sets         SetLog[]
+}
+
+model SetLog {
+  id         String          @id @default(cuid())
+  exerciseId String
+  exercise   SessionExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  setNumber  Int
+  weightLbs  Float
+  reps       Int
+}
