@@ -64,30 +64,32 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-60 min-h-screen bg-white border-r border-slate-200 flex flex-col">
-      <div className="px-6 py-5 border-b border-slate-200">
-        <h1 className="text-lg font-bold text-indigo-600">WorkoutTracker</h1>
-        <p className="text-xs text-slate-500 mt-0.5">Personalized fitness assistant</p>
+    <aside className="w-60 min-h-screen bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col">
+      <div className="px-6 py-5 border-b border-[var(--color-border)]">
+        <h1 className="text-lg font-bold text-[var(--color-accent)] uppercase tracking-widest">WorkoutTracker</h1>
+        <p className="text-xs text-[var(--color-text-faint)] mt-0.5 uppercase tracking-wider">Fitness Assistant</p>
       </div>
-      <nav className="flex-1 py-4 px-3 space-y-1">
+      <nav className="flex-1 py-4 px-0 space-y-0.5">
         {navItems.map((item) => {
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                active ? "bg-indigo-50 text-indigo-700" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors border-l-2 ${
+                active
+                  ? "border-l-[var(--color-accent)] bg-[var(--color-bg)] text-[var(--color-accent)]"
+                  : "border-l-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
               }`}
             >
-              <span className={active ? "text-indigo-600" : "text-slate-400"}>{item.icon}</span>
+              <span className={active ? "text-[var(--color-accent)]" : "text-[var(--color-text-faint)]"}>{item.icon}</span>
               {item.label}
             </Link>
           );
         })}
       </nav>
-      <div className="px-6 py-4 border-t border-slate-200">
-        <p className="text-xs text-slate-400">Powered by Claude AI</p>
+      <div className="px-6 py-4 border-t border-[var(--color-border)]">
+        <p className="text-xs text-[var(--color-text-faint)] uppercase tracking-wider">Powered by Claude AI</p>
       </div>
     </aside>
   );
