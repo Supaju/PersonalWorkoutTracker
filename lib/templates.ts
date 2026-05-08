@@ -197,8 +197,8 @@ export function templateLabel(id: TemplateId): string {
 }
 
 export const TEMPLATE_COLORS: Record<TemplateId, string> = {
-  upper_a: "bg-blue-100 text-blue-800",
-  lower_a: "bg-green-100 text-green-800",
-  upper_b: "bg-violet-100 text-violet-800",
-  lower_b: "bg-orange-100 text-orange-800",
+  upper_a: "bg-[#1a0a0a] text-[#f87171]",
+  lower_a: "bg-[#0a1a0a] text-[#86efac]",
+  upper_b: "bg-[#110a1a] text-[#c4b5fd]",
+  lower_b: "bg-[#1a1000] text-[#fdba74]",
 };

@@ -7,10 +7,10 @@ import type { Equipment } from "@prisma/client";
 const CATEGORIES = Object.entries(EQUIPMENT_CATEGORY_LABELS) as [EquipmentCategory, string][];
 
 const CATEGORY_COLORS: Record<EquipmentCategory, string> = {
-  machine: "bg-blue-100 text-blue-700",
-  free_weight: "bg-orange-100 text-orange-700",
-  bodyweight: "bg-green-100 text-green-700",
-  cardio: "bg-rose-100 text-rose-700",
+  machine: "bg-[#0a0f1a] text-[#93c5fd]",
+  free_weight: "bg-[#1a0f00] text-[#fdba74]",
+  bodyweight: "bg-[#0a1a0a] text-[#86efac]",
+  cardio: "bg-[#1a0a0a] text-[#f87171]",
 };
 
 export default function EquipmentPage() {
