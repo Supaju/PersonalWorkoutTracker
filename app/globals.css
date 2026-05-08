@@ -1,6 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #4f46e5;
-  --color-primary-hover: #4338ca;
+  --color-bg: #0a0a0a;
+  --color-surface: #111111;
+  --color-border: #1e1e1e;
+  --color-accent: #dc2626;
+  --color-accent-hover: #b91c1c;
+  --color-text: #e5e5e5;
+  --color-text-muted: #a3a3a3;
+  --color-text-faint: #525252;
+}
+
+@layer base {
+  body {
+    font-family: 'Space Mono', monospace;
+  }
+}
+
+@layer utilities {
+  .btn-accent {
+    background-color: var(--color-accent);
+    color: #000;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.625rem 1.25rem;
+    transition: background-color 0.15s;
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .btn-accent:hover {
+    background-color: var(--color-accent-hover);
+  }
+  .btn-accent:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
