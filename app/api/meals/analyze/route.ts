@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { anthropic, buildDeviationPrompt } from "@/lib/ai";
 import type { MealEntry } from "@/lib/types";
@@ -7,7 +8,7 @@ export async function POST(req: Request) {
 
   const profile = await db.userProfile.findFirst();
   if (!profile) {
-    return new Response("No profile found.", { status: 400 });
+    return NextResponse.json({ error: "No profile found." }, { status: 400 });
   }
 
   const [mealPlan, foodItems] = await Promise.all([
@@ -33,28 +34,33 @@ export async function POST(req: Request) {
     );
   }
 
-  const prompt = buildDeviationPrompt({ profile, description, currentPlanTotals, date });
+  const { system, user } = buildDeviationPrompt({ profile, description, currentPlanTotals, date });
 
-  const stream = await anthropic.messages.stream({
-    model: "claude-sonnet-4-6",
-    max_tokens: 1000,
-    system: prompt.system,
-    messages: [{ role: "user", content: prompt.user }],
-  });
+  try {
+    const stream = await anthropic.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system,
+      messages: [{ role: "user", content: user }],
+    });
 
-  const encoder = new TextEncoder();
-  const readable = new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
-          controller.enqueue(encoder.encode(chunk.delta.text));
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          if (chunk.type === "content_block_delta" && chunk.delta.type === "text_delta") {
+            controller.enqueue(encoder.encode(chunk.delta.text));
+          }
         }
-      }
-      controller.close();
-    },
-  });
+        controller.close();
+      },
+    });
 
-  return new Response(readable, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+    return new Response(readable, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json({ error: "Failed to analyze meal. Check ANTHROPIC_API_KEY." }, { status: 500 });
+  }
 }

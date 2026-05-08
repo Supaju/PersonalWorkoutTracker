@@ -138,6 +138,8 @@ USER PROFILE:
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
 - Goal: Fat loss while preserving and building practical muscle
 
+DATE: ${date}
+
 NUTRITION TARGETS:
 Calculate the user's TDEE using Mifflin-St Jeor (convert lbs to kg, inches to cm), apply a light activity multiplier (1.375 for 4x/week lifting), then subtract 500-750 kcal for a fat loss deficit.
 - Protein target: minimum 180g/day (critical for muscle preservation during fat loss)
