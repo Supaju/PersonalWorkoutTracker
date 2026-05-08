@@ -6,6 +6,9 @@ export const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
+// Edit this constant to change Claude's personality across all AI features.
+const PERSONA = `You have the energy and enthusiasm of a knowledgeable gym bro — encouraging, real, and occasionally dropping terms like "let's get it", "solid gains", or "bro", but always backed by evidence-based practice. Be direct and no-BS.`;
+
 function formatHeight(totalInches: number): string {
   const ft = Math.floor(totalInches / 12);
   const inch = Math.round(totalInches % 12);
@@ -22,7 +25,7 @@ export function buildPlanPrompt(data: {
   template: TemplateId;
   lastSameSession: SessionWithExercises | null;
   lastAlternateLowerSession: SessionWithExercises | null;
-}): string {
+}): { system: string; user: string } {
   const { profile, equipment, template, lastSameSession, lastAlternateLowerSession } = data;
   const tmpl = TEMPLATES[template];
 
@@ -64,7 +67,9 @@ export function buildPlanPrompt(data: {
     })
     .join("\n\n");
 
-  return `You are an expert personal trainer and exercise scientist. Design a ${tmpl.label} workout for this specific person.
+  return {
+    system: `You are an expert personal trainer and exercise scientist. ${PERSONA}`,
+    user: `Design a ${tmpl.label} workout for this specific person.
 
 USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
@@ -104,7 +109,105 @@ Return ONLY valid JSON in this exact format (no markdown, no explanation outside
       "aiNotes": "<1-2 sentences: why this exercise, any form cues, or progressive overload note>"
     }
   ]
-}`;
+}`,
+  };
+}
+
+// ---- Meal plan prompt ----
+
+export function buildMealPlanPrompt(data: {
+  profile: UserProfile;
+  foodItems: FoodItem[];
+  date: string;
+}): { system: string; user: string } {
+  const { profile, foodItems, date } = data;
+
+  const foodList = foodItems
+    .map(
+      (f) =>
+        `- ID:${f.id} | ${f.name}${f.serving ? ` (${f.serving})` : ""}: ${f.calories} kcal | ${f.protein}g protein | ${f.carbs}g carbs | ${f.fat}g fat`
+    )
+    .join("\n");
+
+  return {
+    system: `You are a sports nutritionist who knows macros and body composition inside out. ${PERSONA}`,
+    user: `Create a daily meal plan. Use ONLY the foods listed below.
+
+USER PROFILE:
+- Age: ${profile.age}, Gender: ${profile.gender}
+- Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
+- Goal: Fat loss while preserving and building practical muscle
+
+NUTRITION TARGETS:
+Calculate the user's TDEE using Mifflin-St Jeor (convert lbs to kg, inches to cm), apply a light activity multiplier (1.375 for 4x/week lifting), then subtract 500-750 kcal for a fat loss deficit.
+- Protein target: minimum 180g/day (critical for muscle preservation during fat loss)
+- Prioritize protein and vegetables; moderate carbs around workouts; keep fat moderate
+- Spread across breakfast, lunch, dinner, and one snack
+
+AVAILABLE FOODS (use the exact IDs):
+${foodList}
+
+Return ONLY valid JSON in this exact format:
+{
+  "planNotes": "2-3 sentences: calorie target, macro breakdown, and key reasoning",
+  "estimatedCalories": <number>,
+  "estimatedProtein": <number>,
+  "estimatedCarbs": <number>,
+  "estimatedFat": <number>,
+  "meals": [
+    {
+      "slot": "breakfast",
+      "items": [
+        { "foodItemId": "<exact ID from list>", "quantity": <number>, "notes": "<optional serving note>" }
+      ]
+    },
+    { "slot": "lunch", "items": [...] },
+    { "slot": "dinner", "items": [...] },
+    { "slot": "snack", "items": [...] }
+  ]
+}`,
+  };
+}
+
+// ---- Deviation analysis prompt ----
+
+export function buildDeviationPrompt(data: {
+  profile: UserProfile;
+  description: string;
+  currentPlanTotals: { calories: number; protein: number; carbs: number; fat: number } | null;
+  date: string;
+}): { system: string; user: string } {
+  const { profile, description, currentPlanTotals, date } = data;
+
+  const planContext = currentPlanTotals
+    ? `Their planned meals today already total: ${Math.round(currentPlanTotals.calories)} kcal | ${Math.round(currentPlanTotals.protein)}g protein | ${Math.round(currentPlanTotals.carbs)}g carbs | ${Math.round(currentPlanTotals.fat)}g fat`
+    : "No meal plan has been logged yet for today.";
+
+  return {
+    system: `You are a sports nutritionist helping someone understand how their food choices fit their goals. ${PERSONA}`,
+    user: `USER PROFILE:
+- Age: ${profile.age}, Gender: ${profile.gender}
+- Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
+- Goal: Fat loss while preserving muscle
+- Approximate daily calorie target: Calculate TDEE (Mifflin-St Jeor, light activity 1.375) minus 500-750 kcal deficit
+
+DATE: ${date}
+${planContext}
+
+WHAT THEY ATE (or plan to eat):
+"${description}"
+
+Please provide:
+
+## Nutrition Estimate
+Estimate the calories and macros for what they described. Be specific — break it down by item if multiple foods were mentioned.
+
+## How It Fits Today
+How does this fit into their daily targets? If they have a meal plan, account for it. Are they over/under on calories and protein?
+
+## Course Correction
+Give 2-3 specific, practical suggestions for what they should eat for the rest of the day to stay on track toward their goals. Be realistic — don't suggest they starve themselves.`,
+  };
 }
 
 // ---- Review prompt (existing feature, updated to use session history) ----
@@ -116,7 +219,7 @@ export function buildReviewPrompt(data: {
   foodItems: FoodItem[];
   mealPlan: MealPlan | null;
   currentTemplate: TemplateId;
-}): string {
+}): { system: string; user: string } {
   const { profile, equipment, recentSessions, foodItems, mealPlan, currentTemplate } = data;
 
   const equipmentSection =
@@ -156,9 +259,9 @@ export function buildReviewPrompt(data: {
 
   const mealSection = mealPlan ? `Today's meal plan:\n${mealPlan.meals}` : "No meal plan for today.";
 
-  return `You are a certified personal trainer and sports nutritionist reviewing a user's fitness program. Be direct, specific, and constructive.
-
-USER PROFILE:
+  return {
+    system: `You are a certified personal trainer and sports nutritionist reviewing a client's program. Be direct, specific, and constructive. ${PERSONA}`,
+    user: `USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
 - Goal: Lose fat through weight training, build practical muscle
@@ -187,5 +290,6 @@ Are the exercises well-chosen for fat loss + practical strength at this body wei
 Are the food choices supporting fat loss while preserving muscle? Assess protein adequacy (target: ~1g per lb of lean body mass).
 
 ## Overall Recommendations
-List 3–5 specific, actionable adjustments to improve results.`;
+List 3–5 specific, actionable adjustments to improve results.`,
+  };
 }

@@ -3,14 +3,15 @@ import { db } from "@/lib/db";
 import { anthropic, buildPlanPrompt } from "@/lib/ai";
 import type { TemplateId } from "@/lib/templates";
 
-export async function POST() {
+export async function POST(req: Request) {
   const profile = await db.userProfile.findFirst();
   if (!profile) {
     return NextResponse.json({ error: "No profile found. Please set up your profile first." }, { status: 400 });
   }
 
+  const body = await req.json().catch(() => ({}));
   const cycle = await db.cycleState.findUnique({ where: { id: "singleton" } });
-  const template = (cycle?.currentTemplate ?? "upper_b") as TemplateId;
+  const template = (body.template ?? cycle?.currentTemplate ?? "upper_b") as TemplateId;
 
   const [equipment, allSessions] = await Promise.all([
     db.equipment.findMany(),
@@ -41,7 +42,8 @@ export async function POST() {
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 2000,
-      messages: [{ role: "user", content: prompt }],
+      system: prompt.system,
+      messages: [{ role: "user", content: prompt.user }],
     });
 
     const text = response.content[0].type === "text" ? response.content[0].text : "";
