@@ -79,7 +79,7 @@ export default function Sidebar() {
               className={`flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors border-l-2 ${
                 active
                   ? "border-l-[var(--color-accent)] bg-[var(--color-bg)] text-[var(--color-accent)]"
-                  : "border-l-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
+                  : "border-l-transparent text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] hover:text-[var(--color-text)]"
               }`}
             >
               <span className={active ? "text-[var(--color-accent)]" : "text-[var(--color-text-faint)]"}>{item.icon}</span>
