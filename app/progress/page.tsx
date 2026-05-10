@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import {
   AreaChart,
   Area,
@@ -102,9 +102,11 @@ function ChartTooltip({
 }
 
 export default function ProgressPage() {
+  const gradId = useId();
   const [data, setData] = useState<ProgressData | null>(null);
   const [activeTab, setActiveTab] = useState<string>("legs");
   const [selectedExercise, setSelectedExercise] = useState<string | null>(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     fetch("/api/progress")
@@ -115,12 +117,26 @@ export default function ProgressPage() {
           d.exercises.some((e) => e.muscleGroup === t)
         );
         if (firstTab) setActiveTab(firstTab);
-      });
+      })
+      .catch(() => setError(true));
   }, []);
 
   if (!data) {
     return (
       <div className="text-[var(--color-text-faint)] text-sm">Loading...</div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h2 className="text-2xl font-bold text-[var(--color-text)] mb-1 uppercase tracking-wide">
+          Strength Progress
+        </h2>
+        <div className="bg-[#1a0505] border border-[#3a1010] text-[#f87171] text-sm p-4 mt-8">
+          Failed to load progress data. Please try refreshing.
+        </div>
+      </div>
     );
   }
 
@@ -228,7 +244,7 @@ export default function ProgressPage() {
               <span className="text-[var(--color-text-faint)]">
                 Started: {exerciseDetail.data[0].maxWeight} lbs
               </span>
-              {exerciseDetail.data.length > 1 && (
+              {exerciseDetail.data.length > 1 && exerciseDetail.data[0].maxWeight !== 0 && (
                 <span className="text-[var(--color-accent)]">
                   {(
                     ((exerciseDetail.data[exerciseDetail.data.length - 1]
@@ -256,7 +272,7 @@ export default function ProgressPage() {
                 >
                   <defs>
                     <linearGradient
-                      id="weightGrad"
+                      id={gradId}
                       x1="0"
                       y1="0"
                       x2="0"
@@ -294,7 +310,7 @@ export default function ProgressPage() {
                     dataKey="maxWeight"
                     stroke="#dc2626"
                     strokeWidth={2}
-                    fill="url(#weightGrad)"
+                    fill={`url(#${gradId})`}
                     dot={{ fill: "#dc2626", r: 3 }}
                     activeDot={{ r: 5, fill: "#dc2626" }}
                   />
