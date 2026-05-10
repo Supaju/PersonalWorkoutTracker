@@ -110,7 +110,7 @@ export default function ProgressPage() {
 
   useEffect(() => {
     fetch("/api/progress")
-      .then((r) => r.json())
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((d: ProgressData) => {
         setData(d);
         const firstTab = TAB_ORDER.find((t) =>
@@ -120,12 +120,6 @@ export default function ProgressPage() {
       })
       .catch(() => setError(true));
   }, []);
-
-  if (!data) {
-    return (
-      <div className="text-[var(--color-text-faint)] text-sm">Loading...</div>
-    );
-  }
 
   if (error) {
     return (
@@ -137,6 +131,12 @@ export default function ProgressPage() {
           Failed to load progress data. Please try refreshing.
         </div>
       </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="text-[var(--color-text-faint)] text-sm">Loading...</div>
     );
   }
 
@@ -383,7 +383,7 @@ export default function ProgressPage() {
             {tabExercises.map((ex) => {
               const latest = ex.data[ex.data.length - 1];
               const pct =
-                ex.data.length > 1
+                ex.data.length > 1 && ex.data[0].maxWeight !== 0
                   ? ((latest.maxWeight - ex.data[0].maxWeight) /
                       ex.data[0].maxWeight) *
                     100
