@@ -50,26 +50,26 @@ export default function EquipmentPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-1">Equipment</h2>
-      <p className="text-slate-500 text-sm mb-8">Add what you have access to — Claude uses this to tailor exercise recommendations.</p>
+      <h2 className="text-2xl font-bold text-[var(--color-text)] mb-1 uppercase tracking-wide">Equipment</h2>
+      <p className="text-[var(--color-text-faint)] text-sm mb-8">Add what you have access to — Claude uses this to tailor exercise recommendations.</p>
 
-      <form onSubmit={handleAdd} className="bg-white rounded-2xl border border-slate-200 p-6 mb-8 flex gap-3 flex-wrap items-end">
+      <form onSubmit={handleAdd} className="bg-[var(--color-surface)] border border-[var(--color-border)] p-6 mb-8 flex gap-3 flex-wrap items-end">
         <div className="flex-1 min-w-[160px]">
-          <label className="block text-sm font-medium text-slate-700 mb-1">Equipment name</label>
+          <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Equipment name</label>
           <input
             required
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="e.g. Barbell, Treadmill, Pull-up bar"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+          <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Category</label>
           <select
             value={form.category}
             onChange={(e) => setForm({ ...form, category: e.target.value as EquipmentCategory })}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            className="bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
           >
             {CATEGORIES.map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
@@ -79,25 +79,25 @@ export default function EquipmentPage() {
         <button
           type="submit"
           disabled={adding}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-50 whitespace-nowrap"
+          className="btn-accent text-xs"
         >
           {adding ? "Adding..." : "Add Equipment"}
         </button>
       </form>
 
       {items.length === 0 ? (
-        <p className="text-slate-400 text-sm">No equipment added yet.</p>
+        <p className="text-[var(--color-text-faint)] text-sm">No equipment added yet.</p>
       ) : (
         <div className="space-y-6">
           {CATEGORIES.map(([cat, label]) =>
             grouped[cat].length > 0 ? (
               <div key={cat}>
-                <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{label}</h3>
+                <h3 className="text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-2">{label}</h3>
                 <div className="flex flex-wrap gap-2">
                   {grouped[cat].map((item) => (
                     <span
                       key={item.id}
-                      className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${CATEGORY_COLORS[cat as EquipmentCategory]}`}
+                      className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium ${CATEGORY_COLORS[cat as EquipmentCategory]}`}
                     >
                       {item.name}
                       <button
