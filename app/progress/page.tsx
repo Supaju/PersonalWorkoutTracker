@@ -169,7 +169,7 @@ export default function ProgressPage() {
             Recent PRs
           </h3>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {data.recentPRs.map((pr) => (
+            {data.recentPRs.slice(0, 4).map((pr) => (
               <button
                 key={pr.name}
                 onClick={() => {
