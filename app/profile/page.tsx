@@ -53,28 +53,28 @@ export default function ProfilePage() {
     setTimeout(() => setSaved(false), 2500);
   };
 
-  if (loading) return <div className="text-slate-400 text-sm">Loading...</div>;
+  if (loading) return <div className="text-[var(--color-text-faint)] text-sm">Loading...</div>;
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-1">Your Profile</h2>
-      <p className="text-slate-500 text-sm mb-8">This information shapes all AI recommendations.</p>
+      <h2 className="text-2xl font-bold text-[var(--color-text)] mb-1 uppercase tracking-wide">Your Profile</h2>
+      <p className="text-[var(--color-text-faint)] text-sm mb-8">This information shapes all AI recommendations.</p>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-8 space-y-6 max-w-lg">
+      <form onSubmit={handleSubmit} className="bg-[var(--color-surface)] border border-[var(--color-border)] p-8 space-y-6 max-w-lg">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Name (optional)</label>
+          <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Name (optional)</label>
           <input
             type="text"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
             placeholder="Your name"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Age</label>
+            <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Age</label>
             <input
               type="number"
               required
@@ -83,15 +83,15 @@ export default function ProfilePage() {
               value={form.age}
               onChange={(e) => setForm({ ...form, age: e.target.value })}
               placeholder="28"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Gender</label>
+            <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Gender</label>
             <select
               value={form.gender}
               onChange={(e) => setForm({ ...form, gender: e.target.value })}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
             >
               <option value="male">Male</option>
               <option value="female">Female</option>
@@ -101,7 +101,7 @@ export default function ProfilePage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Height</label>
+          <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Height</label>
           <div className="flex gap-2 items-center">
             <div className="flex items-center gap-1 flex-1">
               <input
@@ -112,9 +112,9 @@ export default function ProfilePage() {
                 value={form.heightFt}
                 onChange={(e) => setForm({ ...form, heightFt: e.target.value })}
                 placeholder="5"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
               />
-              <span className="text-sm text-slate-500 shrink-0">ft</span>
+              <span className="text-sm text-[var(--color-text-faint)] shrink-0">ft</span>
             </div>
             <div className="flex items-center gap-1 flex-1">
               <input
@@ -125,15 +125,15 @@ export default function ProfilePage() {
                 value={form.heightIn}
                 onChange={(e) => setForm({ ...form, heightIn: e.target.value })}
                 placeholder="10"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
               />
-              <span className="text-sm text-slate-500 shrink-0">in</span>
+              <span className="text-sm text-[var(--color-text-faint)] shrink-0">in</span>
             </div>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Weight</label>
+          <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Weight</label>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -144,14 +144,14 @@ export default function ProfilePage() {
               value={form.weightLbs}
               onChange={(e) => setForm({ ...form, weightLbs: e.target.value })}
               placeholder="175"
-              className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
             />
-            <span className="text-sm text-slate-500 shrink-0">lbs</span>
+            <span className="text-sm text-[var(--color-text-faint)] shrink-0">lbs</span>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Primary Goal</label>
+          <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Primary Goal</label>
           <div className="space-y-2">
             {GOALS.map(([value, label]) => (
               <label key={value} className="flex items-center gap-3 cursor-pointer">
@@ -161,9 +161,9 @@ export default function ProfilePage() {
                   value={value}
                   checked={form.goals === value}
                   onChange={() => setForm({ ...form, goals: value })}
-                  className="text-indigo-600 focus:ring-indigo-500"
+                  className="accent-[var(--color-accent)]"
                 />
-                <span className="text-sm text-slate-700">{label}</span>
+                <span className="text-sm text-[var(--color-text-muted)]">{label}</span>
               </label>
             ))}
           </div>
@@ -172,7 +172,7 @@ export default function ProfilePage() {
         <button
           type="submit"
           disabled={saving}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+          className="btn-accent w-full justify-center text-xs"
         >
           {saving ? "Saving..." : saved ? "Saved!" : "Save Profile"}
         </button>
