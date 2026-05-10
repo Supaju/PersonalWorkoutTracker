@@ -72,8 +72,8 @@ export default function AIReviewPage() {
 
   return (
     <div>
-      <h2 className="text-2xl font-bold text-slate-900 mb-1">AI Review</h2>
-      <p className="text-slate-500 text-sm mb-8">
+      <h2 className="text-2xl font-bold text-[var(--color-text)] mb-1 uppercase tracking-wide">AI Review</h2>
+      <p className="text-[var(--color-text-faint)] text-sm mb-8">
         Claude analyzes your entire plan — profile, workout frequency, exercise selection, and nutrition — and flags anything that doesn&apos;t match your goals.
       </p>
 
@@ -83,7 +83,7 @@ export default function AIReviewPage() {
           <button
             onClick={handleReview}
             disabled={streaming}
-            className="w-full mb-6 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium py-3 rounded-xl transition-colors"
+            className="btn-accent w-full justify-center mb-6"
           >
             {streaming ? (
               <>
@@ -104,7 +104,7 @@ export default function AIReviewPage() {
           </button>
 
           {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl p-4">
+            <div className="mb-4 bg-[#1a0505] border border-[#3a1010] text-[#f87171] text-sm p-4">
               {error}
             </div>
           )}
@@ -112,16 +112,16 @@ export default function AIReviewPage() {
           {displayText && (
             <div
               ref={streamRef}
-              className="bg-white rounded-2xl border border-slate-200 p-6 prose prose-sm prose-slate max-w-none overflow-y-auto max-h-[600px]"
+              className="bg-[var(--color-surface)] border border-[var(--color-border)] p-6 text-sm text-[var(--color-text-muted)] max-w-none overflow-y-auto max-h-[600px]"
               style={{ whiteSpace: "pre-wrap", fontFamily: "inherit" }}
             >
               {displayText}
-              {streaming && <span className="inline-block w-1.5 h-4 bg-indigo-500 ml-0.5 animate-pulse align-middle" />}
+              {streaming && <span className="inline-block w-1.5 h-4 bg-[var(--color-accent)] ml-0.5 animate-pulse align-middle" />}
             </div>
           )}
 
           {!displayText && !streaming && !error && (
-            <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center text-slate-400">
+            <div className="bg-[var(--color-surface)] border border-dashed border-[var(--color-border)] p-12 text-center text-[var(--color-text-faint)]">
               <svg className="w-10 h-10 mx-auto mb-3 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
@@ -134,20 +134,20 @@ export default function AIReviewPage() {
         {/* History sidebar */}
         {history.length > 0 && (
           <div className="w-52 shrink-0">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Past Reviews</h3>
+            <h3 className="text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-3">Past Reviews</h3>
             <div className="space-y-2">
               {history.map((review) => (
                 <button
                   key={review.id}
                   onClick={() => setSelectedReview(selectedReview?.id === review.id ? null : review)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg border text-xs transition-colors ${
+                  className={`w-full text-left px-3 py-2.5 border text-xs transition-colors ${
                     selectedReview?.id === review.id
-                      ? "border-indigo-300 bg-indigo-50 text-indigo-700"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300"
+                      ? "border-[var(--color-accent)] bg-[var(--color-surface)] text-[var(--color-accent)]"
+                      : "border-[var(--color-border)] bg-[var(--color-bg)] text-[var(--color-text-muted)] hover:border-[var(--color-text-faint)]"
                   }`}
                 >
                   <p className="font-medium">{formatDate(review.createdAt)}</p>
-                  <p className="text-slate-400 mt-0.5 line-clamp-2">{review.reviewText.slice(0, 60)}...</p>
+                  <p className="text-[var(--color-text-faint)] mt-0.5 line-clamp-2">{review.reviewText.slice(0, 60)}...</p>
                 </button>
               ))}
             </div>
