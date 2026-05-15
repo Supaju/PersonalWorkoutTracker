@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { TEMPLATES, TEMPLATE_COLORS, CYCLE_ORDER, type TemplateId } from "@/lib/templates";
-import type { AIPlanResponse, PlannedExercise } from "@/lib/types";
+import type { AIPlanResponse, PlannedExercise, Message } from "@/lib/types";
+import { PlanReviseDrawer } from "@/components/PlanReviseDrawer";
 
 export default function PlanSessionPage() {
   const router = useRouter();
@@ -15,6 +16,9 @@ export default function PlanSessionPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [planningMessages, setPlanningMessages] = useState<Message[]>([]);
+  const [initialPlanJson, setInitialPlanJson] = useState("");
 
   useEffect(() => {
     fetch("/api/cycle")
@@ -31,6 +35,8 @@ export default function PlanSessionPage() {
     setPlan(null);
     setExercises([]);
     setError("");
+    setInitialPlanJson("");
+    setPlanningMessages([]);
   };
 
   const generate = async () => {
@@ -38,6 +44,8 @@ export default function PlanSessionPage() {
     setGenerating(true);
     setError("");
     setPlan(null);
+    setInitialPlanJson("");
+    setPlanningMessages([]);
     try {
       const res = await fetch("/api/sessions/plan", {
         method: "POST",
@@ -48,6 +56,7 @@ export default function PlanSessionPage() {
       if (!res.ok) { setError(data.error || "Failed to generate plan."); setGenerating(false); return; }
       setPlan(data.plan);
       setExercises(data.plan.exercises);
+      setInitialPlanJson(JSON.stringify(data.plan));
     } catch {
       setError("Failed to connect. Check ANTHROPIC_API_KEY in .env.local.");
     }
@@ -69,6 +78,7 @@ export default function PlanSessionPage() {
         template,
         notes: plan?.sessionNotes ?? null,
         exercises: exercises.map((ex, i) => ({ ...ex, orderIndex: i })),
+        planningChat: planningMessages.length > 0 ? JSON.stringify(planningMessages) : undefined,
       }),
     });
     const session = await res.json();
@@ -225,7 +235,16 @@ export default function PlanSessionPage() {
             </table>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-widest border border-[var(--color-border)] text-[var(--color-text-faint)] hover:text-[var(--color-text)] hover:border-[var(--color-text-faint)] transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              Revise with AI
+            </button>
             <button
               onClick={saveSession}
               disabled={saving}
@@ -245,6 +264,21 @@ export default function PlanSessionPage() {
           <p className="text-sm">Select a workout type and hit &ldquo;Generate with AI&rdquo;.</p>
           <p className="text-xs mt-1 opacity-70">Claude will design it based on your profile, equipment, and training history.</p>
         </div>
+      )}
+
+      {template && (
+        <PlanReviseDrawer
+          open={drawerOpen}
+          template={template}
+          currentExercises={exercises}
+          initialPlanJson={initialPlanJson}
+          onApply={(updated, msgs) => {
+            setExercises(updated);
+            setPlanningMessages(msgs);
+            // drawer stays open so the user can keep refining
+          }}
+          onClose={() => setDrawerOpen(false)}
+        />
       )}
     </div>
   );

@@ -11,13 +11,14 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const body = await req.json();
-  const { date, template, notes, exercises } = body;
+  const { date, template, notes, exercises, planningChat } = body;
 
   const session = await db.workoutSession.create({
     data: {
       date,
       template,
       notes: notes || null,
+      planningChat: planningChat || null,
       phase: "planned",
       exercises: {
         create: exercises.map(
