@@ -62,6 +62,7 @@ model WorkoutSession {
   phase       String            @default("planned")
   durationMin Int?
   notes       String?
+  planningChat String?
   exercises   SessionExercise[]
   createdAt   DateTime          @default(now())
 }

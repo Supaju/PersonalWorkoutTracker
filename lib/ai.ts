@@ -1,13 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { UserProfile, Equipment, FoodItem, MealPlan, SessionExercise, SetLog, WorkoutSession } from "@prisma/client";
 import { TEMPLATES, type TemplateId } from "@/lib/templates";
+import { AI_CONFIG } from "@/lib/ai-config";
 
 export const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-// Edit this constant to change Claude's personality across all AI features.
-const PERSONA = `You have the energy and enthusiasm of a knowledgeable gym bro — encouraging, real, and occasionally dropping terms like "let's get it", "solid gains", or "bro", but always backed by evidence-based practice. Be direct and no-BS.`;
 
 function formatHeight(totalInches: number): string {
   const ft = Math.floor(totalInches / 12);
@@ -47,8 +45,8 @@ export function buildPlanPrompt(data: {
       .join("\n\n");
 
   const historySection = lastSameSession
-    ? `LAST ${tmpl.label.toUpperCase()} SESSION (${lastSameSession.date}):\n${formatSession(lastSameSession)}\n\nApply progressive overload where appropriate. If a set was clearly too easy, increase weight 5-10 lbs. If the user struggled or failed reps, hold weight or reduce slightly.`
-    : `No previous ${tmpl.label} sessions recorded. This is the first time. Start conservatively — the user is 380 lbs and returning/starting a structured program. Err on the side of lighter weights that allow good form and full rep ranges.`;
+    ? `LAST ${tmpl.label.toUpperCase()} SESSION (${lastSameSession.date}):\n${formatSession(lastSameSession)}\n\n${AI_CONFIG.training.progressiveOverloadGuidance}`
+    : `No previous ${tmpl.label} sessions recorded. This is the first time. ${AI_CONFIG.training.firstSessionGuidance}`;
 
   const alternateLowerNote =
     (template === "lower_a" || template === "lower_b") && lastAlternateLowerSession
@@ -67,15 +65,17 @@ export function buildPlanPrompt(data: {
     })
     .join("\n\n");
 
+  const guidelinesList = AI_CONFIG.training.guidelines.map((g) => `- ${g}`).join("\n");
+
   return {
-    system: `You are an expert personal trainer and exercise scientist. ${PERSONA}`,
+    system: `You are an expert personal trainer and exercise scientist. ${AI_CONFIG.persona}`,
     user: `Design a ${tmpl.label} workout for this specific person.
 
 USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
-- Goal: Lose fat while building practical, functional muscle (NOT bodybuilding)
-- Target session length: ~60 minutes
+- Goal: ${AI_CONFIG.training.goal}
+- Target session length: ${AI_CONFIG.training.sessionLength}
 
 AVAILABLE EQUIPMENT:
 ${equipmentList}
@@ -87,13 +87,7 @@ ${historySection}
 ${alternateLowerNote}
 
 EVIDENCE-BASED GUIDELINES FOR THIS USER:
-- At 380 lbs, prioritize exercises that minimize joint stress while maximizing metabolic output
-- Compound movements burn more calories — favor them
-- Rep range 10-15 with 60-90s rest keeps heart rate elevated for fat loss while building muscle
-- Seated/supported variations reduce lower back strain where appropriate
-- Progressive overload is the primary driver of change — track and advance weights over time
-- Avoid high axial spinal loading (e.g., heavy barbell back squats) until weight decreases
-- Each session should feel challenging but completable — not form failure
+${guidelinesList}
 
 Return ONLY valid JSON in this exact format (no markdown, no explanation outside the JSON):
 {
@@ -130,21 +124,21 @@ export function buildMealPlanPrompt(data: {
     .join("\n");
 
   return {
-    system: `You are a sports nutritionist who knows macros and body composition inside out. ${PERSONA}`,
+    system: `You are a sports nutritionist who knows macros and body composition inside out. ${AI_CONFIG.persona}`,
     user: `Create a daily meal plan. Use ONLY the foods listed below.
 
 USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
-- Goal: Fat loss while preserving and building practical muscle
+- Goal: ${AI_CONFIG.nutrition.goal}
 
 DATE: ${date}
 
 NUTRITION TARGETS:
-Calculate the user's TDEE using Mifflin-St Jeor (convert lbs to kg, inches to cm), apply a light activity multiplier (1.375 for 4x/week lifting), then subtract 500-750 kcal for a fat loss deficit.
-- Protein target: minimum 180g/day (critical for muscle preservation during fat loss)
-- Prioritize protein and vegetables; moderate carbs around workouts; keep fat moderate
-- Spread across breakfast, lunch, dinner, and one snack
+Calculate the user's TDEE using Mifflin-St Jeor (convert lbs to kg, inches to cm), apply a ${AI_CONFIG.nutrition.activityLabel} multiplier (${AI_CONFIG.nutrition.activityMultiplier}), then subtract ${AI_CONFIG.nutrition.deficitKcalRange} kcal for a fat loss deficit.
+- Protein target: minimum ${AI_CONFIG.nutrition.proteinMinGrams}g/day (critical for muscle preservation during fat loss)
+- ${AI_CONFIG.nutrition.macroPriorities}
+- ${AI_CONFIG.nutrition.mealStructure}
 
 AVAILABLE FOODS (use the exact IDs):
 ${foodList}
@@ -186,12 +180,12 @@ export function buildDeviationPrompt(data: {
     : "No meal plan has been logged yet for today.";
 
   return {
-    system: `You are a sports nutritionist helping someone understand how their food choices fit their goals. ${PERSONA}`,
+    system: `You are a sports nutritionist helping someone understand how their food choices fit their goals. ${AI_CONFIG.persona}`,
     user: `USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
-- Goal: Fat loss while preserving muscle
-- Approximate daily calorie target: Calculate TDEE (Mifflin-St Jeor, light activity 1.375) minus 500-750 kcal deficit
+- Goal: ${AI_CONFIG.nutrition.goal}
+- Approximate daily calorie target: Calculate TDEE (Mifflin-St Jeor, ${AI_CONFIG.nutrition.activityLabel} ${AI_CONFIG.nutrition.activityMultiplier}) minus ${AI_CONFIG.nutrition.deficitKcalRange} kcal deficit
 
 DATE: ${date}
 ${planContext}
@@ -212,7 +206,7 @@ Give 2-3 specific, practical suggestions for what they should eat for the rest o
   };
 }
 
-// ---- Review prompt (existing feature, updated to use session history) ----
+// ---- Review prompt ----
 
 export function buildReviewPrompt(data: {
   profile: UserProfile;
@@ -262,11 +256,11 @@ export function buildReviewPrompt(data: {
   const mealSection = mealPlan ? `Today's meal plan:\n${mealPlan.meals}` : "No meal plan for today.";
 
   return {
-    system: `You are a certified personal trainer and sports nutritionist reviewing a client's program. Be direct, specific, and constructive. ${PERSONA}`,
+    system: `You are a certified personal trainer and sports nutritionist reviewing a client's program. Be direct, specific, and constructive. ${AI_CONFIG.persona}`,
     user: `USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
-- Goal: Lose fat through weight training, build practical muscle
+- Goal: ${AI_CONFIG.training.goal}
 - Current cycle position: ${TEMPLATES[currentTemplate]?.label ?? currentTemplate} is next
 
 AVAILABLE EQUIPMENT:
@@ -289,9 +283,15 @@ Is the 4-day Upper A / Lower A / Upper B / Lower B rotation appropriate for this
 Are the exercises well-chosen for fat loss + practical strength at this body weight? Is progressive overload being applied correctly across sessions?
 
 ## Nutrition
-Are the food choices supporting fat loss while preserving muscle? Assess protein adequacy (target: ~1g per lb of lean body mass).
+Are the food choices supporting fat loss while preserving muscle? Assess protein adequacy (target: ~${AI_CONFIG.nutrition.proteinMinGrams}g/day).
 
 ## Overall Recommendations
 List 3–5 specific, actionable adjustments to improve results.`,
   };
+}
+
+// ---- Refine prompt ----
+
+export function buildRefinePrompt(): string {
+  return `You are an expert personal trainer and exercise scientist. ${AI_CONFIG.persona}\n\n${AI_CONFIG.refine.instruction}`;
 }
