@@ -15,6 +15,10 @@ export async function POST(req: Request) {
       userMessage: string;
     };
 
+    if (!template || !userMessage || !Array.isArray(messages) || !Array.isArray(currentExercises)) {
+      return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    }
+
     const profile = await db.userProfile.findFirst();
     if (!profile) {
       return NextResponse.json({ error: "No profile found." }, { status: 400 });
