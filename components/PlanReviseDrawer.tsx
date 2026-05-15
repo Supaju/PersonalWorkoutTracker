@@ -79,7 +79,6 @@ export function PlanReviseDrawer({
       if (!res.ok) {
         setError(data.error || "Failed to get revision.");
         setMessages(messages);
-        setSending(false);
         return;
       }
       const assistantMessage: Message = { role: "assistant", content: data.reply };
@@ -88,8 +87,9 @@ export function PlanReviseDrawer({
     } catch {
       setError("Failed to connect.");
       setMessages(messages);
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -123,6 +123,7 @@ export function PlanReviseDrawer({
           </h3>
           <button
             onClick={onClose}
+            aria-label="Close"
             className="text-[var(--color-text-faint)] hover:text-[var(--color-text)] transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -242,6 +243,7 @@ export function PlanReviseDrawer({
             <button
               onClick={send}
               disabled={sending || !inputText.trim()}
+              aria-label="Send message"
               className="btn-accent px-4 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {sending ? (
