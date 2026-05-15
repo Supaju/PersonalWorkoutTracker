@@ -37,6 +37,7 @@ export default function PlanSessionPage() {
     setError("");
     setInitialPlanJson("");
     setPlanningMessages([]);
+    setDrawerOpen(false);
   };
 
   const generate = async () => {
@@ -46,6 +47,7 @@ export default function PlanSessionPage() {
     setPlan(null);
     setInitialPlanJson("");
     setPlanningMessages([]);
+    setDrawerOpen(false);
     try {
       const res = await fetch("/api/sessions/plan", {
         method: "POST",
@@ -70,19 +72,26 @@ export default function PlanSessionPage() {
   const saveSession = async () => {
     if (!exercises.length || !template) return;
     setSaving(true);
-    const res = await fetch("/api/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        date,
-        template,
-        notes: plan?.sessionNotes ?? null,
-        exercises: exercises.map((ex, i) => ({ ...ex, orderIndex: i })),
-        planningChat: planningMessages.length > 0 ? JSON.stringify(planningMessages) : undefined,
-      }),
-    });
-    const session = await res.json();
-    router.push(`/sessions/${session.id}/record`);
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date,
+          template,
+          notes: plan?.sessionNotes ?? null,
+          exercises: exercises.map((ex, i) => ({ ...ex, orderIndex: i })),
+          planningChat: planningMessages.length > 0 ? JSON.stringify(planningMessages) : undefined,
+        }),
+      });
+      const session = await res.json();
+      if (!res.ok) { setError(session.error || "Failed to save session."); return; }
+      router.push(`/sessions/${session.id}/record`);
+    } catch {
+      setError("Failed to connect.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const tmpl = template ? TEMPLATES[template] : null;
