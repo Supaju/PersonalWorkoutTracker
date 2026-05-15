@@ -55,14 +55,15 @@ export default function PlanSessionPage() {
         body: JSON.stringify({ template }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Failed to generate plan."); setGenerating(false); return; }
+      if (!res.ok) { setError(data.error || "Failed to generate plan."); return; }
       setPlan(data.plan);
       setExercises(data.plan.exercises);
       setInitialPlanJson(JSON.stringify(data.plan));
     } catch {
       setError("Failed to connect. Check ANTHROPIC_API_KEY in .env.local.");
+    } finally {
+      setGenerating(false);
     }
-    setGenerating(false);
   };
 
   const updateExercise = (idx: number, field: keyof PlannedExercise, value: string | number | null) => {

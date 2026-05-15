@@ -166,38 +166,35 @@ export function PlanReviseDrawer({
               <div className="border border-[var(--color-border)] overflow-hidden text-xs">
                 {proposedExercises.map((proposed, i) => {
                   const current = currentExercises[i];
-                  if (!current) return null;
-                  const changed = isChanged(current, proposed);
-                  const fields = changed ? changedFields(current, proposed) : new Set<string>();
+                  const isNew = !current;
+                  const changed = !isNew && isChanged(current!, proposed);
+                  const fields = changed ? changedFields(current!, proposed) : new Set<string>();
                   return (
                     <div
                       key={i}
                       className={`px-3 py-2.5 border-b border-[var(--color-border)] last:border-0 ${
-                        changed
+                        isNew
+                          ? "border-l-2 border-l-green-500 bg-[var(--color-surface)]"
+                          : changed
                           ? "border-l-2 border-l-amber-500 bg-[var(--color-surface)]"
                           : "opacity-40"
                       }`}
                     >
-                      <span
-                        className={
-                          fields.has("name")
-                            ? "font-bold text-amber-400"
-                            : "text-[var(--color-text)]"
-                        }
-                      >
+                      <span className={isNew ? "font-bold text-green-400" : fields.has("name") ? "font-bold text-amber-400" : "text-[var(--color-text)]"}>
                         {proposed.name}
                       </span>
+                      {isNew && <span className="ml-2 text-xs font-bold text-green-400 uppercase tracking-wider">NEW</span>}
                       <span className="text-[var(--color-text-faint)] ml-3">
-                        <span className={fields.has("targetSets") ? "font-bold text-amber-400" : ""}>
+                        <span className={!isNew && fields.has("targetSets") ? "font-bold text-amber-400" : ""}>
                           {proposed.targetSets}
                         </span>
                         {" × "}
-                        <span className={fields.has("targetReps") ? "font-bold text-amber-400" : ""}>
+                        <span className={!isNew && fields.has("targetReps") ? "font-bold text-amber-400" : ""}>
                           {proposed.targetReps}
                         </span>
                         {" @ "}
                         <span
-                          className={fields.has("targetWeight") ? "font-bold text-amber-400" : ""}
+                          className={!isNew && fields.has("targetWeight") ? "font-bold text-amber-400" : ""}
                         >
                           {proposed.targetWeight != null ? `${proposed.targetWeight} lbs` : "BW"}
                         </span>
