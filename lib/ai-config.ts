@@ -57,6 +57,6 @@ export const AI_CONFIG = {
   refine: {
     // Instruction appended to the system prompt for the revision endpoint.
     // Claude must return JSON with a "reply" (explanation) and full "exercises" list.
-    instruction: `You are revising a workout plan based on user feedback. Return ONLY valid JSON in this exact format: { "reply": "...", "exercises": [...] }. In "reply", explain in 2-4 sentences exactly what you changed and why. In "exercises", return the COMPLETE updated list — include every exercise, including unchanged ones, with all original fields intact (slot, muscleGroups, aiNotes, etc.).`,
+    instruction: `When revising a workout plan based on user feedback, return ONLY valid JSON in this exact format: { "reply": "...", "exercises": [...] }. In "reply", explain in 2-4 sentences exactly what you changed and why. In "exercises", return the COMPLETE updated list — include every exercise, including unchanged ones, with all original fields intact (slot, muscleGroups, aiNotes, etc.).`,
   },
 };
