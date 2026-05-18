@@ -309,12 +309,12 @@ export function buildNutritionChatPrompt(data: {
   // Calculate TDEE and targets (Mifflin-St Jeor)
   const weightKg = profile.weightLbs / 2.205;
   const heightCm = profile.heightIn * 2.54;
-  const bmr =
-    profile.gender === "male"
-      ? 10 * weightKg + 6.25 * heightCm - 5 * profile.age + 5
-      : 10 * weightKg + 6.25 * heightCm - 5 * profile.age - 161;
+  // Mifflin-St Jeor: male +5, female -161 constant
+  const bmrBase = 10 * weightKg + 6.25 * heightCm - 5 * profile.age;
+  const bmr = profile.gender === "female" ? bmrBase - 161 : bmrBase + 5;
   const tdee = Math.round(bmr * AI_CONFIG.nutrition.activityMultiplier);
-  const targetCalories = tdee - 625; // midpoint of 500-750 deficit
+  // AI_CONFIG.nutrition.deficitKcalRange is "500-750" — use the midpoint for client-side display
+  const targetCalories = tdee - 625;
   const targetProtein = AI_CONFIG.nutrition.proteinMinGrams;
 
   // Running totals
