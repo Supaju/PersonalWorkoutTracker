@@ -372,8 +372,8 @@ IMPORTANT: Always respond with ONLY valid JSON in this exact format:
 
 Rules:
 - "reply": 2-4 sentences. If food was logged, comment on what was just added, running totals vs targets, and what to aim for in remaining meals. If it was a question/request, answer helpfully. Use the persona.
-- "entries": array of { "description": string, "slot": string, "calories": number, "protein": number, "carbs": number, "fat": number } when the user described food they ate or plan to eat. Set to null when the message is purely a question or request for suggestions with no food to log.
-- slot must be one of: breakfast, lunch, dinner, snack — infer from context (time references, what meal they mention, what's already logged).
+- "entries": array when the user described food they ate or plan to eat, null when the message is purely a question or request for suggestions. Example entry: { "description": "200g grilled chicken breast", "slot": "lunch", "calories": 330, "protein": 62, "carbs": 0, "fat": 7 }
+- slot must be one of: breakfast, lunch, dinner, snack — infer from context (time references, what meal they mention, what's already logged). Default to snack if slot cannot be determined.
 - Use the search_nutrition and search_web tools to look up actual macro data before estimating. Only use pure estimation as a last resort if both tools return nothing useful.
 - Do not include markdown in "reply" — plain text only.
 
