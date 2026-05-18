@@ -90,3 +90,24 @@ model SetLog {
   weightLbs  Float
   reps       Int
 }
+
+model NutritionEntry {
+  id          String   @id @default(cuid())
+  date        String
+  slot        String
+  description String
+  calories    Float
+  protein     Float
+  carbs       Float
+  fat         Float
+  source      String
+  createdAt   DateTime @default(now())
+}
+
+model NutritionChat {
+  id        String   @id @default(cuid())
+  date      String
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+}
