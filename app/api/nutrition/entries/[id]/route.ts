@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+const VALID_SLOTS = new Set(["breakfast", "lunch", "dinner", "snack"]);
+
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = await req.json();
+  if (body.slot !== undefined && !VALID_SLOTS.has(body.slot)) {
+    return NextResponse.json({ error: "Invalid slot." }, { status: 400 });
+  }
   try {
     const entry = await db.nutritionEntry.update({
       where: { id },
