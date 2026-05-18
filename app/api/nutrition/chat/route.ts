@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { anthropic, buildNutritionChatPrompt } from "@/lib/ai";
 import type { NutritionChat } from "@prisma/client";
 
+const VALID_SLOTS = new Set(["breakfast", "lunch", "dinner", "snack"]);
+
 export async function POST(req: Request) {
   const { date, message } = await req.json();
   if (!date || !message) {
@@ -44,7 +46,7 @@ export async function POST(req: Request) {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        reply = parsed.reply ?? "";
+        reply = parsed.reply?.trim() || text;
         parsedEntries = Array.isArray(parsed.entries) ? parsed.entries : [];
       } else {
         reply = text;
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
         db.nutritionEntry.create({
           data: {
             date,
-            slot: e.slot,
+            slot: VALID_SLOTS.has(e.slot) ? e.slot : "snack",
             description: e.description,
             calories: Math.max(0, Number(e.calories) || 0),
             protein: Math.max(0, Number(e.protein) || 0),
