@@ -6,16 +6,22 @@ const NUTRIENT_PROTEIN = 1003; // g per 100g
 const NUTRIENT_CARBS = 1005;   // g per 100g
 const NUTRIENT_FAT = 1004;     // g per 100g
 
+const nutritionCache = new Map<string, { ts: number; result: NutritionSearchResult }>();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
 export type NutritionSearchResult =
   | { found: true; name: string; per100g: { calories: number; protein: number; carbs: number; fat: number } }
   | { found: false };
 
 export async function searchNutrition(query: string): Promise<NutritionSearchResult> {
+  const cached = nutritionCache.get(query);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.result;
+
   const apiKey = process.env.USDA_API_KEY ?? "DEMO_KEY";
   const url = `${USDA_BASE}?query=${encodeURIComponent(query)}&api_key=${apiKey}&dataType=Foundation,SR%20Legacy&pageSize=3`;
 
   try {
-    const res = await fetch(url, { next: { revalidate: 3600 } });
+    const res = await fetch(url);
     if (!res.ok) {
       console.warn(`[nutrition-api] USDA error: ${res.status}`);
       return { found: false };
@@ -23,15 +29,17 @@ export async function searchNutrition(query: string): Promise<NutritionSearchRes
     const data = await res.json();
     const food = data.foods?.[0];
     if (!food) return { found: false };
+    if (!Array.isArray(food.foodNutrients)) return { found: false };
 
     const getNutrient = (id: number): number => {
       const n = (food.foodNutrients as { nutrientId: number; value: number }[])?.find(
         (n) => n.nutrientId === id
       );
-      return Math.round((n?.value ?? 0) * 10) / 10;
+      const raw = n?.value;
+      return Math.round((Number.isFinite(raw) ? Math.max(0, raw as number) : 0) * 10) / 10;
     };
 
-    return {
+    const result = {
       found: true,
       name: food.description as string,
       per100g: {
@@ -41,6 +49,8 @@ export async function searchNutrition(query: string): Promise<NutritionSearchRes
         fat: getNutrient(NUTRIENT_FAT),
       },
     };
+    nutritionCache.set(query, { ts: Date.now(), result });
+    return result;
   } catch (err) {
     console.warn("[nutrition-api] searchNutrition failed:", err);
     return { found: false };
@@ -71,11 +81,12 @@ export async function searchWeb(query: string): Promise<string> {
       return "";
     }
     const data = await res.json();
-    if (data.answer) return data.answer as string;
+    if (typeof data.answer === "string" && data.answer) return data.answer;
     const contents = ((data.results ?? []) as { content: string }[])
       .map((r) => r.content)
       .join("\n\n");
-    return contents.slice(0, 1500);
+    const raw = contents.slice(0, 1500);
+    return (raw.slice(0, raw.lastIndexOf(" ") + 1).trimEnd() || raw);
   } catch (err) {
     console.warn("[nutrition-api] searchWeb failed:", err);
     return "";
