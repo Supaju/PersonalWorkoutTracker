@@ -40,13 +40,49 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   if (action === "update_exercise") {
-    const { exerciseId, name, targetSets, targetReps, targetWeight } = body;
+    const { exerciseId, name, muscleGroups, targetSets, targetReps, targetWeight, aiNotes } = body;
     const ex = await db.sessionExercise.update({
       where: { id: exerciseId },
-      data: { name, targetSets: Number(targetSets), targetReps, targetWeight: targetWeight ?? null },
+      data: {
+        name,
+        muscleGroups: muscleGroups ?? "",
+        targetSets: Number(targetSets),
+        targetReps,
+        targetWeight: targetWeight ? Number(targetWeight) : null,
+        aiNotes: aiNotes ?? null,
+      },
+    });
+    return NextResponse.json(ex);
+  }
+
+  if (action === "remove_exercise") {
+    const { exerciseId } = body;
+    await db.sessionExercise.delete({ where: { id: exerciseId } });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (action === "add_exercise") {
+    const { name, muscleGroups, targetSets, targetReps, targetWeight, slot, orderIndex } = body;
+    const ex = await db.sessionExercise.create({
+      data: {
+        sessionId: id,
+        slot: slot ?? "custom",
+        name,
+        muscleGroups: muscleGroups ?? "",
+        targetSets: Number(targetSets),
+        targetReps,
+        targetWeight: targetWeight ? Number(targetWeight) : null,
+        orderIndex: Number(orderIndex),
+      },
     });
     return NextResponse.json(ex);
   }
 
   return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+}
+
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  await db.workoutSession.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
 }

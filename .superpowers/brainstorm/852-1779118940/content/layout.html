@@ -1,0 +1,131 @@
+<h2>Meals Page Layout</h2>
+<p class="subtitle">The new nutrition section centers on the AI food chat. Which layout feels right for how you'd use it day-to-day?</p>
+
+<div class="cards">
+
+  <!-- Option A: Chat-first / Journal -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d0d;border:1px solid #222;padding:12px;font-family:monospace;font-size:11px;color:#aaa;min-height:240px;">
+      <div style="background:#111;border:1px solid #1e1e1e;padding:6px 10px;margin-bottom:8px;color:#555;font-size:10px;display:flex;justify-content:space-between;">
+        <span style="color:#888;">NUTRITION LOG</span>
+        <span style="color:#555;">📅 May 18</span>
+      </div>
+      <!-- Log entries -->
+      <div style="background:#0f0f0f;border:1px solid #1e1e1e;padding:8px 10px;margin-bottom:4px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="color:#ccc;font-size:10px;">Breakfast · Greek yogurt with berries</span>
+          <span style="color:#555;font-size:10px;">✎</span>
+        </div>
+        <div style="color:#555;font-size:9px;margin-top:2px;">320 kcal · P: 24g · C: 38g · F: 8g</div>
+      </div>
+      <div style="background:#0f0f0f;border:1px solid #1e1e1e;padding:8px 10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="color:#ccc;font-size:10px;">Lunch · Grilled chicken wrap</span>
+          <span style="color:#555;font-size:10px;">✎</span>
+        </div>
+        <div style="color:#555;font-size:9px;margin-top:2px;">520 kcal · P: 42g · C: 45g · F: 14g</div>
+      </div>
+      <!-- AI insight block -->
+      <div style="background:#0a1a0a;border:1px solid #1a3a1a;padding:8px 10px;margin-bottom:8px;">
+        <div style="color:#86efac;font-size:9px;margin-bottom:3px;">AI INSIGHT</div>
+        <div style="color:#6b9e6b;font-size:10px;">840 kcal logged. Still ~900 kcal to go. Hit 66g protein — push for 114g more at dinner. Looking good bro 💪</div>
+      </div>
+      <!-- Chat input at bottom -->
+      <div style="display:flex;gap:6px;">
+        <div style="flex:1;background:#111;border:1px solid #2a2a2a;padding:5px 8px;color:#555;font-size:10px;">I had a large chicken burrito for lunch...</div>
+        <div style="background:#7c3aed;padding:5px 10px;color:#fff;font-size:10px;">→</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Log + Chat stacked</h3>
+      <p>Log entries at top, AI insights after each entry, text input pinned at bottom. Single scrollable column. Most similar to a messaging app — natural for mobile-style use.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Split panel -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d0d;border:1px solid #222;padding:12px;font-family:monospace;font-size:11px;color:#aaa;min-height:240px;display:flex;gap:8px;">
+      <!-- Left: log -->
+      <div style="flex:1;border:1px solid #1e1e1e;">
+        <div style="background:#111;padding:4px 8px;color:#555;font-size:9px;border-bottom:1px solid #1e1e1e;">TODAY'S LOG</div>
+        <div style="padding:8px;">
+          <div style="background:#0f0f0f;border:1px solid #1e1e1e;padding:6px;margin-bottom:4px;">
+            <div style="color:#ccc;font-size:9px;">Breakfast</div>
+            <div style="color:#888;font-size:9px;">Greek yogurt</div>
+            <div style="color:#555;font-size:8px;">320 kcal · P:24g</div>
+          </div>
+          <div style="background:#0f0f0f;border:1px solid #1e1e1e;padding:6px;margin-bottom:4px;">
+            <div style="color:#ccc;font-size:9px;">Lunch</div>
+            <div style="color:#888;font-size:9px;">Chicken wrap</div>
+            <div style="color:#555;font-size:8px;">520 kcal · P:42g</div>
+          </div>
+          <div style="background:#111;border:1px dashed #2a2a2a;padding:6px;text-align:center;color:#444;font-size:9px;">+ Add manually</div>
+        </div>
+        <!-- Totals at bottom of left -->
+        <div style="background:#0a1a0a;border-top:1px solid #1a3a1a;padding:6px 8px;">
+          <div style="color:#86efac;font-size:8px;">840 kcal · P:66g · C:83g · F:22g</div>
+          <div style="color:#555;font-size:8px;">~900 kcal remaining</div>
+        </div>
+      </div>
+      <!-- Right: chat -->
+      <div style="flex:1;border:1px solid #1e1e1e;display:flex;flex-direction:column;">
+        <div style="background:#111;padding:4px 8px;color:#555;font-size:9px;border-bottom:1px solid #1e1e1e;">AI CHAT</div>
+        <div style="flex:1;padding:8px;overflow:hidden;">
+          <div style="background:#0f0f0f;border:1px solid #1e1e1e;padding:5px;margin-bottom:4px;color:#888;font-size:9px;">I had a large chicken burrito for lunch...</div>
+          <div style="background:#110a1a;border:1px solid #2a1a3a;padding:5px;color:#c4b5fd;font-size:9px;">Logged! ~730 kcal, ~38g protein. You're on track — solid choice bro. Try a lighter dinner to hit your deficit.</div>
+        </div>
+        <div style="display:flex;gap:4px;padding:6px;border-top:1px solid #1e1e1e;">
+          <div style="flex:1;background:#111;border:1px solid #2a2a2a;padding:4px 6px;color:#555;font-size:9px;">Tell me what you ate...</div>
+          <div style="background:#7c3aed;padding:4px 8px;color:#fff;font-size:9px;">→</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Side-by-side split</h3>
+      <p>Log entries on the left, AI conversation on the right. Both visible at once. Best for desktop use — you see your full day and chat simultaneously.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Tabs -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d0d;border:1px solid #222;padding:12px;font-family:monospace;font-size:11px;color:#aaa;min-height:240px;">
+      <!-- Tab bar -->
+      <div style="display:flex;gap:0;margin-bottom:8px;border-bottom:1px solid #222;">
+        <div style="padding:5px 12px;background:#0d0d0d;border-bottom:2px solid #7c3aed;color:#a78bfa;font-size:10px;">LOG</div>
+        <div style="padding:5px 12px;color:#555;font-size:10px;">AI CHAT</div>
+        <div style="padding:5px 12px;color:#555;font-size:10px;">FOOD LIBRARY</div>
+        <div style="margin-left:auto;padding:5px 8px;color:#555;font-size:10px;">📅 May 18</div>
+      </div>
+      <!-- Log tab content -->
+      <div style="background:#0f0f0f;border:1px solid #1e1e1e;padding:8px 10px;margin-bottom:4px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="color:#ccc;font-size:10px;">Breakfast · Greek yogurt with berries</span>
+          <span style="color:#555;font-size:10px;">✎</span>
+        </div>
+        <div style="color:#555;font-size:9px;margin-top:2px;">320 kcal · P: 24g · C: 38g · F: 8g</div>
+      </div>
+      <div style="background:#0f0f0f;border:1px solid #1e1e1e;padding:8px 10px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="color:#ccc;font-size:10px;">Lunch · Chicken wrap</span>
+          <span style="color:#555;font-size:10px;">✎</span>
+        </div>
+        <div style="color:#555;font-size:9px;margin-top:2px;">520 kcal · P: 42g · C: 45g · F: 14g</div>
+      </div>
+      <div style="background:#111;border:1px solid #1e1e1e;padding:8px 10px;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;margin-bottom:8px;">
+        <div style="text-align:center;"><div style="color:#f87171;font-size:13px;font-weight:bold;">840</div><div style="color:#555;font-size:8px;">kcal</div></div>
+        <div style="text-align:center;"><div style="color:#86efac;font-size:13px;font-weight:bold;">66g</div><div style="color:#555;font-size:8px;">protein</div></div>
+        <div style="text-align:center;"><div style="color:#fdba74;font-size:13px;font-weight:bold;">83g</div><div style="color:#555;font-size:8px;">carbs</div></div>
+        <div style="text-align:center;"><div style="color:#93c5fd;font-size:13px;font-weight:bold;">22g</div><div style="color:#555;font-size:8px;">fat</div></div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <div style="flex:1;background:#111;border:1px solid #2a2a2a;padding:5px 8px;color:#555;font-size:10px;">Tell Claude what you ate... or ask for suggestions</div>
+        <div style="background:#7c3aed;padding:5px 10px;color:#fff;font-size:10px;">→</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Tabbed (Log / Chat / Library)</h3>
+      <p>Three tabs: Log (today's entries + totals + quick AI input at bottom), Chat (full conversation history), Food Library (manage saved foods). Most organized but adds navigation overhead.</p>
+    </div>
+  </div>
+
+</div>

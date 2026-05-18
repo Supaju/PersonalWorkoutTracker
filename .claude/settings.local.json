@@ -8,7 +8,14 @@
       "Bash(taskkill /F /IM node.exe)",
       "PowerShell(Stop-Process *)",
       "Bash(npm run *)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/profile)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/profile)",
+      "Bash(node -e ' *)",
+      "Read(//tmp/**)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Skill(claude-api)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(bash *)"
     ]
   }
 }

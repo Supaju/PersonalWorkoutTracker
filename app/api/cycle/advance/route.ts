@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getNextTemplate, type TemplateId } from "@/lib/templates";
 
-export async function POST() {
+export async function POST(req: Request) {
+  const body = await req.json().catch(() => ({}));
   const cycle = await db.cycleState.findUnique({ where: { id: "singleton" } });
-  const current = (cycle?.currentTemplate ?? "upper_b") as TemplateId;
-  const next = getNextTemplate(current);
+  const completed = (body.completedTemplate ?? cycle?.currentTemplate ?? "upper_b") as TemplateId;
+  const next = getNextTemplate(completed);
 
   const updated = await db.cycleState.upsert({
     where: { id: "singleton" },
