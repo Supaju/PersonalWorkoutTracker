@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { UserProfile, Equipment, FoodItem, MealPlan, SessionExercise, SetLog, WorkoutSession } from "@prisma/client";
+import type { UserProfile, Equipment, FoodItem, MealPlan, SessionExercise, SetLog, WorkoutSession, NutritionEntry } from "@prisma/client";
 import { TEMPLATES, type TemplateId } from "@/lib/templates";
 import { AI_CONFIG } from "@/lib/ai-config";
 
@@ -294,4 +294,88 @@ List 3–5 specific, actionable adjustments to improve results.`,
 
 export function buildRefinePrompt(): string {
   return `You are an expert personal trainer and exercise scientist. ${AI_CONFIG.persona}\n\n${AI_CONFIG.refine.instruction}`;
+}
+
+// ---- Nutrition chat prompt ----
+
+export function buildNutritionChatPrompt(data: {
+  profile: UserProfile;
+  entries: NutritionEntry[];
+  foodItems: FoodItem[];
+  date: string;
+}): { system: string } {
+  const { profile, entries, foodItems, date } = data;
+
+  // Calculate TDEE and targets (Mifflin-St Jeor)
+  const weightKg = profile.weightLbs / 2.205;
+  const heightCm = profile.heightIn * 2.54;
+  const bmr =
+    profile.gender === "male"
+      ? 10 * weightKg + 6.25 * heightCm - 5 * profile.age + 5
+      : 10 * weightKg + 6.25 * heightCm - 5 * profile.age - 161;
+  const tdee = Math.round(bmr * AI_CONFIG.nutrition.activityMultiplier);
+  const targetCalories = tdee - 625; // midpoint of 500-750 deficit
+  const targetProtein = AI_CONFIG.nutrition.proteinMinGrams;
+
+  // Running totals
+  const totals = entries.reduce(
+    (acc, e) => ({
+      calories: acc.calories + e.calories,
+      protein: acc.protein + e.protein,
+      carbs: acc.carbs + e.carbs,
+      fat: acc.fat + e.fat,
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  );
+
+  // Format entries by slot for context
+  const SLOTS = ["breakfast", "lunch", "dinner", "snack"] as const;
+  const entryLines = SLOTS.flatMap((slot) =>
+    entries
+      .filter((e) => e.slot === slot)
+      .map(
+        (e) =>
+          `${slot}: ${e.description} — ${Math.round(e.calories)} kcal, ${Math.round(e.protein)}g protein, ${Math.round(e.carbs)}g carbs, ${Math.round(e.fat)}g fat`
+      )
+  );
+  const logSection = entryLines.length > 0 ? entryLines.join("\n") : "Nothing logged yet.";
+
+  // Food library for suggestions
+  const foodLibrarySection =
+    foodItems.length > 0
+      ? foodItems
+          .map(
+            (f) =>
+              `${f.name} — ${f.calories} kcal, ${f.protein}g P, ${f.carbs}g C, ${f.fat}g F per ${f.serving || "serving"}`
+          )
+          .join("\n")
+      : "No foods in library.";
+
+  const system = `${AI_CONFIG.persona}
+
+Your role: conversational nutrition tracking assistant. The user describes food they ate; you log it and guide their day.
+
+Goal: ${AI_CONFIG.nutrition.goal}
+Macro priorities: ${AI_CONFIG.nutrition.macroPriorities}
+
+Today is ${date}. Food logged so far:
+${logSection}
+
+Running totals: ${Math.round(totals.calories)} kcal / ${Math.round(totals.protein)}g protein / ${Math.round(totals.carbs)}g carbs / ${Math.round(totals.fat)}g fat
+Daily targets: ~${targetCalories} kcal / ${targetProtein}g+ protein
+
+User's food library (prefer these when suggesting specific foods, supplement with general knowledge):
+${foodLibrarySection}
+
+IMPORTANT: Always respond with ONLY valid JSON in this exact format:
+{ "reply": "...", "entries": [...] or null }
+
+Rules:
+- "reply": 2-4 sentences. If food was logged, comment on what was just added, running totals vs targets, and what to aim for in remaining meals. If it was a question/request, answer helpfully. Use the persona.
+- "entries": array of { "description": string, "slot": string, "calories": number, "protein": number, "carbs": number, "fat": number } when the user described food they ate or plan to eat. Set to null when the message is purely a question or request for suggestions with no food to log.
+- slot must be one of: breakfast, lunch, dinner, snack — infer from context (time references, what meal they mention, what's already logged).
+- Estimate macros accurately from the food description using your knowledge. Be realistic, not conservative.
+- Do not include markdown in "reply" — plain text only.`;
+
+  return { system };
 }
