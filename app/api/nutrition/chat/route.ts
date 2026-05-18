@@ -44,9 +44,17 @@ const tools: Anthropic.Tool[] = [
 ];
 
 export async function POST(req: Request) {
-  const { date, message } = await req.json();
+  let date: string, message: string;
+  try {
+    ({ date, message } = await req.json());
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
   if (!date || !message) {
     return NextResponse.json({ error: "date and message are required" }, { status: 400 });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return NextResponse.json({ error: "date must be in YYYY-MM-DD format" }, { status: 400 });
   }
 
   const [profile, entries, chatHistory, foodItems] = await Promise.all([
@@ -94,14 +102,27 @@ export async function POST(req: Request) {
         toolUseBlocks.map(async (block) => {
           let resultContent: string;
 
+          const inputQuery =
+            typeof block.input === "object" &&
+            block.input !== null &&
+            typeof (block.input as Record<string, unknown>).query === "string"
+              ? ((block.input as Record<string, unknown>).query as string).trim()
+              : "";
+
           if (block.name === "search_nutrition") {
-            const input = block.input as { query: string };
-            const result = await searchNutrition(input.query);
-            resultContent = JSON.stringify(result);
+            if (!inputQuery) {
+              resultContent = JSON.stringify({ found: false });
+            } else {
+              const result = await searchNutrition(inputQuery);
+              resultContent = JSON.stringify(result);
+            }
           } else if (block.name === "search_web") {
-            const input = block.input as { query: string };
-            const text = await searchWeb(input.query);
-            resultContent = text || "No results found.";
+            if (!inputQuery) {
+              resultContent = "No results found.";
+            } else {
+              const text = await searchWeb(inputQuery);
+              resultContent = text || "No results found.";
+            }
           } else {
             resultContent = "Unknown tool.";
           }
@@ -129,8 +150,23 @@ export async function POST(req: Request) {
       });
     }
 
+    if (response.stop_reason === "tool_use") {
+      console.warn("[nutrition-chat] MAX_TOOL_ROUNDS reached without final text response");
+      return NextResponse.json(
+        { error: "Could not complete nutrition lookup. Please try rephrasing your message." },
+        { status: 500 }
+      );
+    }
+
     const textBlock = response.content.find((b) => b.type === "text");
-    const text = textBlock && textBlock.type === "text" ? textBlock.text : "{}";
+    if (!textBlock || textBlock.type !== "text") {
+      console.warn("[nutrition-chat] No text block in final Claude response");
+      return NextResponse.json(
+        { error: "Received an unexpected response. Please try again." },
+        { status: 500 }
+      );
+    }
+    const text = textBlock.text;
 
     let reply = "";
     let parsedEntries: Array<{
