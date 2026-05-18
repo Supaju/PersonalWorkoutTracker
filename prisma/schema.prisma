@@ -102,6 +102,8 @@ model NutritionEntry {
   fat         Float
   source      String
   createdAt   DateTime @default(now())
+
+  @@index([date])
 }
 
 model NutritionChat {
@@ -110,4 +112,6 @@ model NutritionChat {
   role      String
   content   String
   createdAt DateTime @default(now())
+
+  @@index([date])
 }
