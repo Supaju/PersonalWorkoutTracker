@@ -374,8 +374,15 @@ Rules:
 - "reply": 2-4 sentences. If food was logged, comment on what was just added, running totals vs targets, and what to aim for in remaining meals. If it was a question/request, answer helpfully. Use the persona.
 - "entries": array of { "description": string, "slot": string, "calories": number, "protein": number, "carbs": number, "fat": number } when the user described food they ate or plan to eat. Set to null when the message is purely a question or request for suggestions with no food to log.
 - slot must be one of: breakfast, lunch, dinner, snack — infer from context (time references, what meal they mention, what's already logged).
-- Estimate macros accurately from the food description using your knowledge. Be realistic, not conservative.
-- Do not include markdown in "reply" — plain text only.`;
+- Use the search_nutrition and search_web tools to look up actual macro data before estimating. Only use pure estimation as a last resort if both tools return nothing useful.
+- Do not include markdown in "reply" — plain text only.
+
+Tool use strategy:
+- Call search_nutrition for EVERY food item you identify in the user's message before producing entries. Search one food at a time (e.g. "chicken breast", "white rice cooked", "olive oil").
+- USDA returns values per 100g. Estimate the quantity in grams from context and scale: (quantity_g / 100) × per100g_value. Reference amounts: large chicken breast ≈ 180g cooked, 1 cup cooked rice ≈ 200g, 1 large egg ≈ 50g, 1 tbsp oil ≈ 14g, 1 cup milk ≈ 244g.
+- If search_nutrition returns { "found": false } for a restaurant dish or complex meal, call search_web with a focused query like "hibachi steak shrimp restaurant typical ingredients portion sizes grams", then call search_nutrition for each ingredient found.
+- You may call search_nutrition multiple times per turn — once per food item. This is expected and correct.
+- Only fall back to pure estimation if both tools return no usable data.`;
 
   return { system };
 }
