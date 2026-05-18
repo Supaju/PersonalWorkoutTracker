@@ -499,10 +499,10 @@ export default function MealsPage() {
                 <div className="grid grid-cols-4 gap-2 text-center">
                   {(
                     [
-                      { label: "Calories", value: Math.round(totals.calories), unit: "kcal", color: "text-[#dc2626]", target: targets.calories },
-                      { label: "Protein", value: Math.round(totals.protein), unit: "g", color: "text-[#86efac]", target: targets.protein },
+                      { label: "Calories", value: Math.round(totals.calories), unit: "kcal", color: totals.calories > targets.calories ? "text-[#dc2626]" : "text-[#86efac]", target: targets.calories },
+                      { label: "Protein", value: Math.round(totals.protein), unit: "g", color: totals.protein >= targets.protein ? "text-[#86efac]" : "text-[#fbbf24]", target: targets.protein },
                       { label: "Carbs", value: Math.round(totals.carbs), unit: "g", color: "text-[#fdba74]", target: null },
-                      { label: "Fat", value: Math.round(totals.fat), unit: "g", color: "text-[#f87171]", target: null },
+                      { label: "Fat", value: Math.round(totals.fat), unit: "g", color: "text-[#93c5fd]", target: null },
                     ] as const
                   ).map(({ label, value, unit, color, target }) => (
                     <div key={label}>
