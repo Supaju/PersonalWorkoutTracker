@@ -1,9 +1,47 @@
 import { NextResponse } from "next/server";
+import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import { anthropic, buildNutritionChatPrompt } from "@/lib/ai";
+import { searchNutrition, searchWeb } from "@/lib/nutrition-api";
 import type { NutritionChat } from "@prisma/client";
 
 const VALID_SLOTS = new Set(["breakfast", "lunch", "dinner", "snack"]);
+const MAX_TOOL_ROUNDS = 8;
+
+const tools: Anthropic.Tool[] = [
+  {
+    name: "search_nutrition",
+    description:
+      "Search the USDA FoodData Central database for a food item. Returns macros per 100g. Use this for every food item you identify before estimating. Search one food at a time.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "Food name to search, e.g. 'chicken breast' or 'cooked white rice'. One food at a time — keep it simple.",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "search_web",
+    description:
+      "Search the web for information about a restaurant dish or complex meal — typical ingredients and portion sizes in grams. Use this when search_nutrition returns nothing useful. Then call search_nutrition for each ingredient found.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "Search query, e.g. 'hibachi steak shrimp restaurant typical ingredients portion sizes grams'.",
+        },
+      },
+      required: ["query"],
+    },
+  },
+];
 
 export async function POST(req: Request) {
   const { date, message } = await req.json();
@@ -19,28 +57,90 @@ export async function POST(req: Request) {
   ]);
 
   if (!profile) {
-    return NextResponse.json({ error: "No profile found. Please set up your profile first." }, { status: 400 });
+    return NextResponse.json(
+      { error: "No profile found. Please set up your profile first." },
+      { status: 400 }
+    );
   }
 
   const { system } = buildNutritionChatPrompt({ profile, entries, foodItems, date });
 
-  const messages: { role: "user" | "assistant"; content: string }[] = [
-    ...chatHistory.map((m: NutritionChat) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    { role: "user", content: message },
+  let messages: Anthropic.MessageParam[] = [
+    ...chatHistory.map((m: NutritionChat) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    })),
+    { role: "user" as const, content: message },
   ];
 
   try {
-    const response = await anthropic.messages.create({
+    let response = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1024,
+      max_tokens: 4096,
       system,
+      tools,
       messages,
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
+    let rounds = 0;
+    while (response.stop_reason === "tool_use" && rounds < MAX_TOOL_ROUNDS) {
+      rounds++;
+
+      const toolUseBlocks = response.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
+      );
+
+      const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
+        toolUseBlocks.map(async (block) => {
+          let resultContent: string;
+
+          if (block.name === "search_nutrition") {
+            const input = block.input as { query: string };
+            const result = await searchNutrition(input.query);
+            resultContent = JSON.stringify(result);
+          } else if (block.name === "search_web") {
+            const input = block.input as { query: string };
+            const text = await searchWeb(input.query);
+            resultContent = text || "No results found.";
+          } else {
+            resultContent = "Unknown tool.";
+          }
+
+          return {
+            type: "tool_result" as const,
+            tool_use_id: block.id,
+            content: resultContent,
+          };
+        })
+      );
+
+      messages = [
+        ...messages,
+        { role: "assistant" as const, content: response.content },
+        { role: "user" as const, content: toolResults },
+      ];
+
+      response = await anthropic.messages.create({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4096,
+        system,
+        tools,
+        messages,
+      });
+    }
+
+    const textBlock = response.content.find((b) => b.type === "text");
+    const text = textBlock && textBlock.type === "text" ? textBlock.text : "{}";
 
     let reply = "";
-    let parsedEntries: Array<{ description: string; slot: string; calories: number; protein: number; carbs: number; fat: number }> = [];
+    let parsedEntries: Array<{
+      description: string;
+      slot: string;
+      calories: number;
+      protein: number;
+      carbs: number;
+      fat: number;
+    }> = [];
 
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -55,7 +155,6 @@ export async function POST(req: Request) {
       reply = text;
     }
 
-    // Save new nutrition entries
     const createdEntries = await Promise.all(
       parsedEntries.map((e) =>
         db.nutritionEntry.create({
@@ -73,7 +172,6 @@ export async function POST(req: Request) {
       )
     );
 
-    // Save chat messages (store only reply text, not full JSON)
     await db.nutritionChat.createMany({
       data: [
         { date, role: "user", content: message },
@@ -84,6 +182,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply, newEntries: createdEntries });
   } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Failed to get AI response. Check ANTHROPIC_API_KEY." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to get AI response. Check ANTHROPIC_API_KEY." },
+      { status: 500 }
+    );
   }
 }
