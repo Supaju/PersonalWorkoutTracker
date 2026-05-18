@@ -13,10 +13,11 @@ export const GOAL_LABELS: Record<Goal, string> = {
   athletic_performance: "Athletic Performance",
 };
 
-export type EquipmentCategory = "machine" | "free_weight" | "bodyweight" | "cardio";
+export type EquipmentCategory = "machine_cable" | "machine_plate" | "free_weight" | "bodyweight" | "cardio";
 
 export const EQUIPMENT_CATEGORY_LABELS: Record<EquipmentCategory, string> = {
-  machine: "Machine",
+  machine_cable: "Cable / Stack Machine",
+  machine_plate: "Plate-Loaded Machine",
   free_weight: "Free Weight",
   bodyweight: "Bodyweight",
   cardio: "Cardio",

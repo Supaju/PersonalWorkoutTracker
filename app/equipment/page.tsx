@@ -7,7 +7,8 @@ import type { Equipment } from "@prisma/client";
 const CATEGORIES = Object.entries(EQUIPMENT_CATEGORY_LABELS) as [EquipmentCategory, string][];
 
 const CATEGORY_COLORS: Record<EquipmentCategory, string> = {
-  machine: "bg-[#0a0f1a] text-[#93c5fd]",
+  machine_cable: "bg-[#0a0f1a] text-[#93c5fd]",
+  machine_plate: "bg-[#0a0d1a] text-[#7dd3fc]",
   free_weight: "bg-[#1a0f00] text-[#fdba74]",
   bodyweight: "bg-[#0a1a0a] text-[#86efac]",
   cardio: "bg-[#1a0a0a] text-[#f87171]",
@@ -15,7 +16,7 @@ const CATEGORY_COLORS: Record<EquipmentCategory, string> = {
 
 export default function EquipmentPage() {
   const [items, setItems] = useState<Equipment[]>([]);
-  const [form, setForm] = useState({ name: "", category: "machine" as EquipmentCategory });
+  const [form, setForm] = useState({ name: "", category: "machine_cable" as EquipmentCategory });
   const [adding, setAdding] = useState(false);
 
   const load = () =>
@@ -33,7 +34,7 @@ export default function EquipmentPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    setForm({ name: "", category: "machine" });
+    setForm({ name: "", category: "machine_cable" });
     await load();
     setAdding(false);
   };
