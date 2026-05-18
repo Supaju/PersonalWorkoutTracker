@@ -38,8 +38,9 @@ interface DayTargets {
   protein: number;
 }
 
+const today = new Date().toISOString().split("T")[0];
+
 export default function MealsPage() {
-  const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(today);
   const [entries, setEntries] = useState<NutritionEntry[]>([]);
   const [chat, setChat] = useState<ChatMessage[]>([]);
@@ -60,6 +61,9 @@ export default function MealsPage() {
     fat: "",
   });
   const [addingManual, setAddingManual] = useState(false);
+
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
@@ -88,6 +92,10 @@ export default function MealsPage() {
     setLoading(true);
     try {
       const res = await fetch(`/api/nutrition?date=${d}`);
+      if (!res.ok) {
+        console.error("Failed to load nutrition data:", res.status);
+        return;
+      }
       const data = await res.json();
       setEntries(data.entries ?? []);
       setChat(data.chat ?? []);
@@ -112,7 +120,7 @@ export default function MealsPage() {
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chat, sending]);
+  }, [chat]);
 
   const totals = entries.reduce(
     (acc, e) => ({
@@ -127,20 +135,21 @@ export default function MealsPage() {
   const sendMessage = async () => {
     const text = message.trim();
     if (!text || sending) return;
+    const currentDate = date; // capture snapshot
     setSending(true);
     setMessage("");
 
     const tempId = "temp-" + Date.now();
     setChat((prev) => [
       ...prev,
-      { id: tempId, date, role: "user", content: text, createdAt: new Date().toISOString() },
+      { id: tempId, date: currentDate, role: "user", content: text, createdAt: new Date().toISOString() },
     ]);
 
     try {
       const res = await fetch("/api/nutrition/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, message: text }),
+        body: JSON.stringify({ date: currentDate, message: text }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -148,7 +157,7 @@ export default function MealsPage() {
           ...prev,
           {
             id: "err-" + Date.now(),
-            date,
+            date: currentDate,
             role: "assistant",
             content: "Error: " + (data.error || "Failed to get response."),
             createdAt: new Date().toISOString(),
@@ -156,13 +165,13 @@ export default function MealsPage() {
         ]);
         return;
       }
-      await loadData(date);
+      await loadData(currentDate);
     } catch {
       setChat((prev) => [
         ...prev,
         {
           id: "err-" + Date.now(),
-          date,
+          date: currentDate,
           role: "assistant",
           content: "Failed to connect. Check your connection and try again.",
           createdAt: new Date().toISOString(),
@@ -181,8 +190,18 @@ export default function MealsPage() {
   };
 
   const deleteEntry = async (id: string) => {
-    await fetch(`/api/nutrition/entries/${id}`, { method: "DELETE" });
-    setEntries((prev) => prev.filter((e) => e.id !== id));
+    if (deletingId) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/nutrition/entries/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        alert("Failed to delete entry. Please try again.");
+        return;
+      }
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const startEdit = (entry: NutritionEntry) => {
@@ -198,22 +217,31 @@ export default function MealsPage() {
   };
 
   const saveEdit = async () => {
-    if (!editingId) return;
-    const res = await fetch(`/api/nutrition/entries/${editingId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        description: editForm.description,
-        slot: editForm.slot,
-        calories: parseFloat(editForm.calories) || 0,
-        protein: parseFloat(editForm.protein) || 0,
-        carbs: parseFloat(editForm.carbs) || 0,
-        fat: parseFloat(editForm.fat) || 0,
-      }),
-    });
-    const updated = await res.json();
-    setEntries((prev) => prev.map((e) => (e.id === editingId ? updated : e)));
-    setEditingId(null);
+    if (!editingId || saving) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/nutrition/entries/${editingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: editForm.description,
+          slot: editForm.slot,
+          calories: parseFloat(editForm.calories) || 0,
+          protein: parseFloat(editForm.protein) || 0,
+          carbs: parseFloat(editForm.carbs) || 0,
+          fat: parseFloat(editForm.fat) || 0,
+        }),
+      });
+      if (!res.ok) {
+        alert("Failed to save changes. Please try again.");
+        return;
+      }
+      const updated = await res.json();
+      setEntries((prev) => prev.map((e) => (e.id === editingId ? updated : e)));
+      setEditingId(null);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const addManual = async (e: React.FormEvent) => {
@@ -233,6 +261,10 @@ export default function MealsPage() {
           fat: parseFloat(manualForm.fat) || 0,
         }),
       });
+      if (!res.ok) {
+        alert("Failed to add entry. Please try again.");
+        return;
+      }
       const entry = await res.json();
       setEntries((prev) => [...prev, entry]);
       setManualForm({ description: "", slot: "lunch", calories: "", protein: "", carbs: "", fat: "" });
@@ -245,19 +277,26 @@ export default function MealsPage() {
   const handleAddFood = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddingFood(true);
-    await fetch("/api/meals/foods", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(foodForm),
-    });
-    setFoodForm({ name: "", calories: "", protein: "", carbs: "", fat: "", serving: "" });
-    setShowFoodForm(false);
-    await loadFoods();
-    setAddingFood(false);
+    try {
+      await fetch("/api/meals/foods", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(foodForm),
+      });
+      setFoodForm({ name: "", calories: "", protein: "", carbs: "", fat: "", serving: "" });
+      setShowFoodForm(false);
+      await loadFoods();
+    } finally {
+      setAddingFood(false);
+    }
   };
 
   const handleDeleteFood = async (id: string) => {
-    await fetch(`/api/meals/foods?id=${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/meals/foods?id=${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      alert("Failed to delete food. Please try again.");
+      return;
+    }
     setFoods((prev) => prev.filter((f) => f.id !== id));
   };
 
@@ -353,8 +392,8 @@ export default function MealsPage() {
                                 ))}
                               </div>
                               <div className="flex gap-2">
-                                <button onClick={saveEdit} className="btn-accent text-xs">
-                                  Save
+                                <button onClick={saveEdit} disabled={saving} className="btn-accent text-xs">
+                                  {saving ? "Saving..." : "Save"}
                                 </button>
                                 <button
                                   onClick={() => setEditingId(null)}
@@ -396,6 +435,7 @@ export default function MealsPage() {
                                 </button>
                                 <button
                                   onClick={() => deleteEntry(entry.id)}
+                                  disabled={deletingId === entry.id}
                                   className="text-[var(--color-text-faint)] hover:text-[var(--color-accent)] transition-colors p-0.5"
                                   aria-label="Delete"
                                 >
@@ -567,11 +607,13 @@ export default function MealsPage() {
               onKeyDown={handleKeyDown}
               placeholder="I had a large chicken burrito for lunch..."
               rows={2}
+              aria-label="Chat with nutrition assistant"
               className="flex-1 bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)] resize-none"
             />
             <button
               onClick={sendMessage}
               disabled={sending || !message.trim()}
+              aria-label="Send message"
               className="btn-accent text-xs self-end"
             >
               {sending ? (
@@ -614,6 +656,7 @@ export default function MealsPage() {
       <div className="border-t border-[var(--color-border)] pt-6">
         <button
           onClick={() => setShowLibrary(!showLibrary)}
+          aria-expanded={showLibrary}
           className="flex items-center gap-2 text-sm font-bold text-[var(--color-text-muted)] hover:text-[var(--color-text)] mb-4 uppercase tracking-widest"
         >
           <svg
