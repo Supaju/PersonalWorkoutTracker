@@ -14,7 +14,8 @@ export type NutritionSearchResult =
   | { found: false };
 
 export async function searchNutrition(query: string): Promise<NutritionSearchResult> {
-  const cached = nutritionCache.get(query);
+  const cacheKey = query.trim().toLowerCase();
+  const cached = nutritionCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.result;
 
   const apiKey = process.env.USDA_API_KEY ?? "DEMO_KEY";
@@ -49,7 +50,7 @@ export async function searchNutrition(query: string): Promise<NutritionSearchRes
         fat: getNutrient(NUTRIENT_FAT),
       },
     };
-    nutritionCache.set(query, { ts: Date.now(), result });
+    nutritionCache.set(cacheKey, { ts: Date.now(), result });
     return result;
   } catch (err) {
     console.warn("[nutrition-api] searchNutrition failed:", err);
