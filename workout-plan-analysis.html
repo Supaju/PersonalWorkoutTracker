@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workout Plan — Revision 2 | Loading & Progression</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #1a1a1a;
+      --surface-2: #242424;
+      --border: #2e2e2e;
+      --accent: #dc2626;
+      --accent-light: #ef4444;
+      --accent-muted: rgba(220,38,38,0.10);
+      --green: #22c55e;
+      --green-muted: rgba(34,197,94,0.10);
+      --yellow: #f59e0b;
+      --yellow-muted: rgba(245,158,11,0.10);
+      --blue: #3b82f6;
+      --blue-muted: rgba(59,130,246,0.10);
+      --purple: #a78bfa;
+      --purple-muted: rgba(167,139,250,0.10);
+      --text: #e8e8e8;
+      --text-muted: #8a8a8a;
+      --text-faint: #444;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 5rem;
+    }
+
+    h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; }
+    h2 { font-size: 1.3rem; font-weight: 700; margin-bottom: 0.85rem; }
+    h3 { font-size: 0.98rem; font-weight: 700; margin-bottom: 0.35rem; }
+    h4 { font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 0.45rem; }
+    p  { margin-bottom: 0.8rem; color: var(--text-muted); }
+    p:last-child { margin-bottom: 0; }
+    strong { color: var(--text); }
+    ul, ol { padding-left: 1.4rem; color: var(--text-muted); }
+    ul li, ol li { margin-bottom: 0.35rem; }
+
+    /* ── Header ── */
+    .page-header { border-left: 4px solid var(--accent); padding-left: 1.2rem; margin-bottom: 1rem; }
+    .eyebrow { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-muted); margin-bottom: 0.4rem; }
+
+    .meta-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1.25rem 0 2.5rem; }
+    .chip { background: var(--surface); border: 1px solid var(--border); padding: 0.28rem 0.75rem; font-size: 0.8rem; color: var(--text-muted); }
+    .chip strong { color: var(--accent-light); }
+    .chip.green strong { color: var(--green); }
+
+    .label {
+      display: inline-block;
+      font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px;
+      padding: 0.2rem 0.6rem; margin-bottom: 0.65rem;
+    }
+    .label-red    { background: var(--accent); color: #fff; }
+    .label-green  { background: var(--green-muted); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .label-blue   { background: var(--blue-muted); color: var(--blue); border: 1px solid rgba(59,130,246,0.2); }
+    .label-yellow { background: var(--yellow-muted); color: var(--yellow); border: 1px solid rgba(245,158,11,0.2); }
+    .label-purple { background: var(--purple-muted); color: var(--purple); border: 1px solid rgba(167,139,250,0.2); }
+
+    .section { margin-bottom: 3rem; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); padding: 1.1rem 1.3rem; margin-bottom: 0.85rem; }
+    .card.green  { border-left: 3px solid var(--green); }
+    .card.red    { border-left: 3px solid var(--accent); }
+    .card.blue   { border-left: 3px solid var(--blue); }
+    .card.yellow { border-left: 3px solid var(--yellow); }
+    .card.purple { border-left: 3px solid var(--purple); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    @media (max-width: 740px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+    @media (min-width: 741px) and (max-width: 900px) { .grid-4 { grid-template-columns: 1fr 1fr; } }
+
+    /* ── Revision log ── */
+    .rev-item {
+      display: flex; gap: 1rem;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.88rem;
+    }
+    .rev-item:last-child { border-bottom: none; }
+    .rev-tag { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; padding: 0.15rem 0.5rem; white-space: nowrap; align-self: flex-start; margin-top: 0.1rem; flex-shrink: 0; }
+    .rev-locked { background: var(--green-muted); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    .rev-added  { background: var(--blue-muted); color: var(--blue); border: 1px solid rgba(59,130,246,0.2); }
+
+    /* ── Quick ref cards ── */
+    .ref-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.85rem; margin-bottom: 0.5rem; }
+    @media (max-width: 680px) { .ref-grid { grid-template-columns: 1fr; } }
+    .ref-card { background: var(--surface); border: 1px solid var(--border); padding: 0.95rem 1.1rem; }
+    .ref-day-name { font-weight: 700; font-size: 0.88rem; margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.5rem; }
+    .ref-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .ref-list { font-size: 0.8rem; color: var(--text-muted); list-style: none; }
+    .ref-list li { padding: 0.28rem 0; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; gap: 0.5rem; align-items: baseline; }
+    .ref-list li:last-child { border-bottom: none; }
+    .ref-sets { color: var(--text-faint); font-size: 0.75rem; flex-shrink: 0; }
+    .ref-list li.primary-ex { color: var(--text); }
+    .ref-list li.primary-ex .ref-sets { color: var(--text-muted); }
+
+    /* ── Day cards ── */
+    .day-card { border: 1px solid var(--border); background: var(--surface); margin-bottom: 1.5rem; overflow: hidden; }
+    .day-header { padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.8rem; }
+    .day-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .day-title { font-weight: 700; font-size: 1rem; }
+    .day-focus { font-size: 0.8rem; color: var(--text-muted); }
+    .day-meta { margin-left: auto; font-size: 0.78rem; color: var(--text-faint); white-space: nowrap; }
+
+    .ex-table { width: 100%; border-collapse: collapse; }
+    .ex-table thead th { background: var(--surface-2); font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-faint); padding: 0.45rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    .ex-table tbody tr { border-bottom: 1px solid var(--border); }
+    .ex-table tbody tr:last-child { border-bottom: none; }
+    .ex-table tbody tr.primary-row { background: rgba(255,255,255,0.018); }
+    .ex-table tbody td { padding: 0.7rem 1rem; vertical-align: top; }
+    .ex-num { font-size: 0.7rem; font-weight: 700; color: var(--text-faint); }
+    .ex-name { font-weight: 700; font-size: 0.9rem; }
+    .ex-alt  { font-size: 0.77rem; color: var(--text-muted); margin-top: 0.15rem; }
+    .ex-sets { font-weight: 700; font-size: 0.88rem; white-space: nowrap; }
+    .ex-reps { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.1rem; }
+    .ex-prog { font-size: 0.78rem; color: var(--yellow); margin-top: 0.25rem; }
+    .ex-why  { font-size: 0.8rem; color: var(--text-muted); }
+
+    .tier-badge { display: inline-block; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; padding: 0.12rem 0.45rem; vertical-align: middle; margin-right: 0.4rem; }
+    .tier-primary  { background: var(--accent-muted); color: var(--accent-light); }
+    .tier-acc      { background: rgba(255,255,255,0.04); color: var(--text-faint); }
+    .tier-core     { background: var(--blue-muted); color: var(--blue); }
+    .tier-finisher { background: var(--green-muted); color: var(--green); }
+
+    .vol-summary { display: flex; flex-wrap: wrap; gap: 1.25rem; padding: 0.7rem 1rem; background: var(--surface-2); border-top: 1px solid var(--border); font-size: 0.8rem; }
+    .vol-item { color: var(--text-muted); }
+    .vol-item strong { color: var(--text); }
+
+    /* ── Loading system ── */
+    .dp-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .dp-header {
+      background: var(--surface-2);
+      padding: 0.8rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .dp-header h3 { margin: 0; font-size: 1rem; }
+    .dp-body { padding: 1rem 1.25rem; }
+    .dp-step {
+      display: flex; gap: 0.9rem;
+      padding: 0.65rem 0;
+      border-bottom: 1px solid var(--border);
+      align-items: flex-start;
+    }
+    .dp-step:last-child { border-bottom: none; }
+    .dp-n {
+      width: 1.6rem; height: 1.6rem;
+      background: var(--accent-muted);
+      color: var(--accent-light);
+      font-size: 0.8rem; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; margin-top: 0.05rem;
+    }
+    .dp-text h4 { color: var(--text); font-size: 0.85rem; text-transform: none; letter-spacing: 0; margin-bottom: 0.2rem; }
+
+    /* ── Lift cards ── */
+    .lift-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+    @media (max-width: 680px) { .lift-grid { grid-template-columns: 1fr; } }
+    .lift-card { background: var(--surface); border: 1px solid var(--border); overflow: hidden; }
+    .lift-card-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.65rem; }
+    .lift-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .lift-name { font-weight: 700; font-size: 0.92rem; }
+    .lift-day { font-size: 0.72rem; color: var(--text-faint); margin-left: auto; }
+    .lift-body { padding: 0.85rem 1rem; }
+    .lift-row { display: flex; justify-content: space-between; align-items: baseline; padding: 0.35rem 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
+    .lift-row:last-child { border-bottom: none; }
+    .lift-label { color: var(--text-muted); }
+    .lift-val { font-weight: 700; color: var(--text); text-align: right; }
+    .lift-val.accent { color: var(--accent-light); }
+    .lift-val.green  { color: var(--green); }
+    .lift-val.yellow { color: var(--yellow); }
+
+    /* ── Rest protocol ── */
+    .rest-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .rest-table th { background: var(--surface-2); padding: 0.5rem 1rem; text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-muted); border-bottom: 2px solid var(--border); }
+    .rest-table td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--text-muted); }
+    .rest-table td strong { color: var(--text); }
+    .rest-table tr:last-child td { border-bottom: none; }
+    .rest-time { font-weight: 800; font-size: 1rem; color: var(--accent-light); white-space: nowrap; }
+
+    /* ── Benchmark timeline ── */
+    .timeline { position: relative; padding-left: 2rem; }
+    .timeline::before { content: ''; position: absolute; left: 0.55rem; top: 0; bottom: 0; width: 2px; background: var(--border); }
+    .tl-item { position: relative; margin-bottom: 1.5rem; }
+    .tl-dot { position: absolute; left: -1.5rem; top: 0.3rem; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+    .tl-period { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--accent-light); margin-bottom: 0.25rem; }
+    .tl-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.3rem; }
+    .tl-body { font-size: 0.85rem; color: var(--text-muted); }
+    .tl-milestones { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .tl-milestone { background: var(--surface); border: 1px solid var(--border); padding: 0.25rem 0.65rem; font-size: 0.78rem; color: var(--text-muted); }
+    .tl-milestone strong { color: var(--green); }
+
+    /* ── Deload ── */
+    .deload-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 680px) { .deload-grid { grid-template-columns: 1fr; } }
+
+    /* ── Stall breakers ── */
+    .stall-item { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--yellow); padding: 0.9rem 1.1rem; margin-bottom: 0.75rem; display: flex; gap: 1rem; }
+    .stall-num { font-size: 1.1rem; font-weight: 800; color: var(--yellow); flex-shrink: 0; min-width: 1.5rem; }
+
+    /* ── RPE ── */
+    .rpe-bar { display: flex; gap: 0.3rem; margin: 0.75rem 0; }
+    .rpe-seg { flex: 1; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; }
+
+    /* ── Rules ── */
+    .rule { display: flex; gap: 1rem; padding: 0.85rem 0; border-bottom: 1px solid var(--border); }
+    .rule:last-child { border-bottom: none; }
+    .rule-n { font-size: 1.3rem; font-weight: 800; color: var(--accent); line-height: 1; min-width: 1.8rem; text-align: right; flex-shrink: 0; }
+    .rule-body h3 { font-size: 0.95rem; color: var(--text); }
+
+    .footer { font-size: 0.78rem; color: var(--text-faint); padding-top: 1.5rem; border-top: 1px solid var(--border); }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+  </style>
+</head>
+<body>
+
+<!-- ══════ HEADER ══════ -->
+<div class="page-header">
+  <div class="eyebrow">Revision 2 — Loading Schemes, Progressive Overload &amp; Benchmarks</div>
+  <h1>The Complete Plan:<br>How Heavy, How Fast, What to Expect</h1>
+</div>
+
+<div class="meta-row">
+  <div class="chip">Goal: <strong>Fat Loss First</strong></div>
+  <div class="chip">Secondary: <strong>Functional Strength</strong></div>
+  <div class="chip">Frequency: <strong>3–4×/week</strong></div>
+  <div class="chip">Structure: <strong>6 exercises · 20 sets per session</strong></div>
+  <div class="chip green">Status: <strong>Structure Locked</strong></div>
+</div>
+
+
+<!-- ══════ REVISION LOG ══════ -->
+<div class="section">
+  <div class="label label-blue">What Changed in Revision 2</div>
+  <h2>Revision Log</h2>
+
+  <div class="card" style="padding: 0.5rem 1.3rem;">
+    <div class="rev-item">
+      <span class="rev-tag rev-locked">Locked</span>
+      <div><strong>No dedicated arms slot.</strong> Face Pull stays on Upper A for shoulder health. Indirect arm work from compound pressing and pulling is sufficient for the goals.</div>
+    </div>
+    <div class="rev-item">
+      <span class="rev-tag rev-locked">Locked</span>
+      <div><strong>Back volume is adequate at 11 sets per cycle.</strong> Identified swap if needed: Incline Press → second row variation on Upper B. Chest volume takes the reduction, not back.</div>
+    </div>
+    <div class="rev-item">
+      <span class="rev-tag rev-locked">Locked</span>
+      <div><strong>Upper B vertical/vertical pairing confirmed.</strong> Upper A = horizontal push/pull. Upper B = vertical push/pull. Together they cover all four major upper body movement patterns with a primary compound each.</div>
+    </div>
+    <div class="rev-item">
+      <span class="rev-tag rev-added">Added</span>
+      <div><strong>Double progression loading system</strong> — the exact rule for when to add weight to every exercise in the program.</div>
+    </div>
+    <div class="rev-item">
+      <span class="rev-tag rev-added">Added</span>
+      <div><strong>Per-lift progression cards</strong> — specific increment, rep range, and expected rate of progress for each of the four primary lifts.</div>
+    </div>
+    <div class="rev-item">
+      <span class="rev-tag rev-added">Added</span>
+      <div><strong>Rest period protocol</strong> — exact rest by exercise type. Not a suggestion range, a specific number.</div>
+    </div>
+    <div class="rev-item">
+      <span class="rev-tag rev-added">Added</span>
+      <div><strong>RPE system</strong> — how hard each set should feel, so you know whether the weight is right without needing a 1RM test.</div>
+    </div>
+    <div class="rev-item">
+      <span class="rev-tag rev-added">Added</span>
+      <div><strong>30 / 60 / 90 / 180-day benchmark calendar</strong> — concrete milestones to track progress beyond just the scale.</div>
+    </div>
+    <div class="rev-item">
+      <span class="rev-tag rev-added">Added</span>
+      <div><strong>Deload protocol</strong> — scheduled every 6–8 weeks, specific weights and structure.</div>
+    </div>
+    <div class="rev-item">
+      <span class="rev-tag rev-added">Added</span>
+      <div><strong>Stall-breaker playbook</strong> — what to do in order when a lift stops moving, before assuming the program is broken.</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════ THE CONFIRMED STRUCTURE ══════ -->
+<div class="section">
+  <div class="label label-green">Confirmed Structure</div>
+  <h2>The Four Days — Locked</h2>
+
+  <div class="ref-grid">
+    <div class="ref-card">
+      <div class="ref-day-name"><div class="ref-dot" style="background:#f87171;"></div>Upper A — Horizontal / Overhead</div>
+      <ul class="ref-list">
+        <li class="primary-ex"><span>Flat Barbell Bench Press</span><span class="ref-sets">4 × 6–10</span></li>
+        <li class="primary-ex"><span>Barbell / Chest-Supported Row</span><span class="ref-sets">4 × 8–12</span></li>
+        <li><span>Seated Overhead Press</span><span class="ref-sets">3 × 10–14</span></li>
+        <li><span>Face Pull / Rear Delt Fly</span><span class="ref-sets">3 × 15–20</span></li>
+        <li><span>Dead Bug</span><span class="ref-sets">3 × 10/side</span></li>
+        <li><span>Farmer Carries</span><span class="ref-sets">3 rounds</span></li>
+      </ul>
+    </div>
+    <div class="ref-card">
+      <div class="ref-day-name"><div class="ref-dot" style="background:#86efac;"></div>Lower A — Squat / Hip Hinge</div>
+      <ul class="ref-list">
+        <li class="primary-ex"><span>Hack Squat / Leg Press</span><span class="ref-sets">4 × 8–12</span></li>
+        <li class="primary-ex"><span>Romanian Deadlift</span><span class="ref-sets">4 × 10–14</span></li>
+        <li><span>Leg Curl Machine</span><span class="ref-sets">3 × 12–15</span></li>
+        <li><span>Hip Abduction Machine</span><span class="ref-sets">3 × 15–20</span></li>
+        <li><span>Cable Crunch</span><span class="ref-sets">3 × 12–15</span></li>
+        <li><span>Sled Push</span><span class="ref-sets">3 rounds</span></li>
+      </ul>
+    </div>
+    <div class="ref-card">
+      <div class="ref-day-name"><div class="ref-dot" style="background:#c4b5fd;"></div>Upper B — Vertical Push / Vertical Pull</div>
+      <ul class="ref-list">
+        <li class="primary-ex"><span>Seated Overhead Press</span><span class="ref-sets">4 × 6–10</span></li>
+        <li class="primary-ex"><span>Lat Pulldown</span><span class="ref-sets">4 × 8–12</span></li>
+        <li><span>Incline Machine Press</span><span class="ref-sets">3 × 10–14</span></li>
+        <li><span>Chest-Supported Row</span><span class="ref-sets">3 × 12–15</span></li>
+        <li><span>Pallof Press</span><span class="ref-sets">3 × 10/side</span></li>
+        <li><span>Farmer Carries / Battle Ropes</span><span class="ref-sets">3 rounds</span></li>
+      </ul>
+    </div>
+    <div class="ref-card">
+      <div class="ref-day-name"><div class="ref-dot" style="background:#fdba74;"></div>Lower B — Deadlift / Hip Thrust</div>
+      <ul class="ref-list">
+        <li class="primary-ex"><span>Trap Bar Deadlift</span><span class="ref-sets">4 × 5–8</span></li>
+        <li class="primary-ex"><span>Barbell Hip Thrust</span><span class="ref-sets">4 × 10–14</span></li>
+        <li><span>Leg Extension</span><span class="ref-sets">3 × 12–15</span></li>
+        <li><span>Single-Leg Press</span><span class="ref-sets">3 × 10–12/leg</span></li>
+        <li><span>Bird Dog</span><span class="ref-sets">3 × 10/side</span></li>
+        <li><span>Sled Push / Farmer Carries</span><span class="ref-sets">3 rounds</span></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════ THE LOADING SYSTEM ══════ -->
+<div class="section">
+  <div class="label label-red">Loading System</div>
+  <h2>How to Know When to Add Weight</h2>
+
+  <p>Every exercise in the program uses <strong>double progression</strong>. One rule. Works for every lift. No 1RM testing required.</p>
+
+  <div class="dp-box">
+    <div class="dp-header">
+      <h3>The Double Progression Rule</h3>
+    </div>
+    <div class="dp-body">
+      <div class="dp-step">
+        <div class="dp-n">1</div>
+        <div class="dp-text">
+          <h4>Pick a starting weight you can do for the bottom of your rep range on all sets</h4>
+          <p>If your rep range is 8–12, start with a weight you can hit 8 clean reps on every set. Not 12. Not failure. Controlled. Conservative is correct here — the weight will go up fast in the first few weeks regardless.</p>
+        </div>
+      </div>
+      <div class="dp-step">
+        <div class="dp-n">2</div>
+        <div class="dp-text">
+          <h4>Work within the rep range — let the reps climb each session</h4>
+          <p>Session to session, push to complete as many reps as possible within your range. If you got 8, 8, 8, 8 last session, try for 9, 9, 8, 8 this session. The reps naturally accumulate as you adapt to the weight.</p>
+        </div>
+      </div>
+      <div class="dp-step">
+        <div class="dp-n">3</div>
+        <div class="dp-text">
+          <h4>When you hit the top of your range on every set — add weight</h4>
+          <p>If your range is 8–12 and you complete 12, 12, 12, 12 → add weight next session. Not before. Not when you hit 12 on the first set. All sets. Then add weight.</p>
+        </div>
+      </div>
+      <div class="dp-step">
+        <div class="dp-n">4</div>
+        <div class="dp-text">
+          <h4>Reset to near the bottom of the range with the new weight</h4>
+          <p>After adding weight you'll naturally drop back toward the bottom of your range. That's correct. Now you climb again. This wave — accumulate reps, add weight, accumulate again — is progressive overload executing exactly as designed.</p>
+        </div>
+      </div>
+      <div class="dp-step">
+        <div class="dp-n">5</div>
+        <div class="dp-text">
+          <h4>If you can't hit the bottom of your range — drop the weight</h4>
+          <p>If you added weight and you can't hit 8 reps on any set, you jumped too fast. Drop back to the previous weight, complete a session there, then make a smaller jump. There is no shame in this — it's the system working.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card blue">
+    <h3>Example: Bench Press at 185 lbs, rep range 6–10</h3>
+    <p style="margin-bottom:0.5rem;">Session 1: 185 × 6, 6, 6, 6 — <strong style="color:var(--text-muted);">Stay at 185</strong></p>
+    <p style="margin-bottom:0.5rem;">Session 2: 185 × 7, 7, 7, 6 — <strong style="color:var(--text-muted);">Stay at 185</strong></p>
+    <p style="margin-bottom:0.5rem;">Session 3: 185 × 8, 8, 7, 7 — <strong style="color:var(--text-muted);">Stay at 185</strong></p>
+    <p style="margin-bottom:0.5rem;">Session 4: 185 × 9, 9, 9, 9 — <strong style="color:var(--text-muted);">Close — stay</strong></p>
+    <p style="margin-bottom:0.5rem;">Session 5: 185 × 10, 10, 10, 10 — <strong style="color:var(--green);">Add 5 lbs → move to 190</strong></p>
+    <p>Session 6: 190 × 7, 7, 6, 6 — <strong style="color:var(--text-muted);">Normal. Climb again from here.</strong></p>
+  </div>
+</div>
+
+
+<!-- ══════ PER-LIFT CARDS ══════ -->
+<div class="section">
+  <div class="label label-red">The Four Primary Lifts</div>
+  <h2>Progression Rules Per Lift</h2>
+
+  <p>These are the four strength benchmarks of the program. Everything else in each session supports these. Track them every session. Chase them every cycle.</p>
+
+  <div class="lift-grid">
+
+    <!-- Bench -->
+    <div class="lift-card">
+      <div class="lift-card-header">
+        <div class="lift-dot" style="background:#f87171;"></div>
+        <div class="lift-name">Flat Barbell Bench Press</div>
+        <div class="lift-day">Upper A · #1</div>
+      </div>
+      <div class="lift-body">
+        <div class="lift-row"><span class="lift-label">Rep range</span><span class="lift-val">6–10</span></div>
+        <div class="lift-row"><span class="lift-label">Sets</span><span class="lift-val">4 (primary)</span></div>
+        <div class="lift-row"><span class="lift-label">Weight increment</span><span class="lift-val accent">+5 lbs</span></div>
+        <div class="lift-row"><span class="lift-label">Trigger</span><span class="lift-val">10 reps on all 4 sets</span></div>
+        <div class="lift-row"><span class="lift-label">Expected frequency</span><span class="lift-val green">Every 2–4 weeks</span></div>
+        <div class="lift-row"><span class="lift-label">Rest between sets</span><span class="lift-val yellow">2–3 min</span></div>
+        <div class="lift-row"><span class="lift-label">Target RPE last set</span><span class="lift-val">8 (2 reps left)</span></div>
+        <div class="lift-row" style="border-bottom:none; padding-top:0.6rem;"><span class="lift-label" style="color:var(--text-muted); font-size:0.78rem; line-height:1.4;">This is your primary horizontal push strength marker. The number on this bar is the clearest signal of upper body strength progress. It should go up every 2–4 weeks indefinitely in this phase.</span></div>
+      </div>
+    </div>
+
+    <!-- Trap Bar DL -->
+    <div class="lift-card">
+      <div class="lift-card-header">
+        <div class="lift-dot" style="background:#fdba74;"></div>
+        <div class="lift-name">Trap Bar Deadlift</div>
+        <div class="lift-day">Lower B · #1</div>
+      </div>
+      <div class="lift-body">
+        <div class="lift-row"><span class="lift-label">Rep range</span><span class="lift-val">5–8</span></div>
+        <div class="lift-row"><span class="lift-label">Sets</span><span class="lift-val">4 (primary)</span></div>
+        <div class="lift-row"><span class="lift-label">Weight increment</span><span class="lift-val accent">+10 lbs</span></div>
+        <div class="lift-row"><span class="lift-label">Trigger</span><span class="lift-val">8 reps on all 4 sets</span></div>
+        <div class="lift-row"><span class="lift-label">Expected frequency</span><span class="lift-val green">Every 2–3 weeks</span></div>
+        <div class="lift-row"><span class="lift-label">Rest between sets</span><span class="lift-val yellow">3 min</span></div>
+        <div class="lift-row"><span class="lift-label">Target RPE last set</span><span class="lift-val">8–9 (1–2 reps left)</span></div>
+        <div class="lift-row" style="border-bottom:none; padding-top:0.6rem;"><span class="lift-label" style="color:var(--text-muted); font-size:0.78rem; line-height:1.4;">Lower body tolerates larger jumps than upper body — +10 lbs is appropriate early on. Lower the increment to +5 lbs when weekly jumps start feeling like a stretch. This is your most functional strength number: it directly maps to how much you can pick up off the floor.</span></div>
+      </div>
+    </div>
+
+    <!-- OHP -->
+    <div class="lift-card">
+      <div class="lift-card-header">
+        <div class="lift-dot" style="background:#c4b5fd;"></div>
+        <div class="lift-name">Seated Overhead Press</div>
+        <div class="lift-day">Upper B · #1 · Upper A · #3</div>
+      </div>
+      <div class="lift-body">
+        <div class="lift-row"><span class="lift-label">Primary sets (Upper B)</span><span class="lift-val">4 × 6–10</span></div>
+        <div class="lift-row"><span class="lift-label">Accessory sets (Upper A)</span><span class="lift-val">3 × 10–14</span></div>
+        <div class="lift-row"><span class="lift-label">Weight increment</span><span class="lift-val accent">+5 lbs</span></div>
+        <div class="lift-row"><span class="lift-label">Trigger (Upper B)</span><span class="lift-val">10 reps on all 4 sets</span></div>
+        <div class="lift-row"><span class="lift-label">Expected frequency</span><span class="lift-val green">Every 3–5 weeks</span></div>
+        <div class="lift-row"><span class="lift-label">Rest between sets</span><span class="lift-val yellow">2 min</span></div>
+        <div class="lift-row"><span class="lift-label">Target RPE last set</span><span class="lift-val">8 (2 reps left)</span></div>
+        <div class="lift-row" style="border-bottom:none; padding-top:0.6rem;"><span class="lift-label" style="color:var(--text-muted); font-size:0.78rem; line-height:1.4;">The overhead press progresses more slowly than the bench press — roughly 60% of the rate. This is normal and universal, not a sign of failure. Use the same weight on Upper A's accessory sets as you're using on Upper B's primary sets when you first start. Upper A's higher rep range will feel easier — that's intentional.</span></div>
+      </div>
+    </div>
+
+    <!-- Hack Squat / Leg Press -->
+    <div class="lift-card">
+      <div class="lift-card-header">
+        <div class="lift-dot" style="background:#86efac;"></div>
+        <div class="lift-name">Hack Squat / Leg Press</div>
+        <div class="lift-day">Lower A · #1</div>
+      </div>
+      <div class="lift-body">
+        <div class="lift-row"><span class="lift-label">Rep range</span><span class="lift-val">8–12</span></div>
+        <div class="lift-row"><span class="lift-label">Sets</span><span class="lift-val">4 (primary)</span></div>
+        <div class="lift-row"><span class="lift-label">Weight increment</span><span class="lift-val accent">+10–20 lbs</span></div>
+        <div class="lift-row"><span class="lift-label">Trigger</span><span class="lift-val">12 reps on all 4 sets</span></div>
+        <div class="lift-row"><span class="lift-label">Expected frequency</span><span class="lift-val green">Every 2–3 weeks</span></div>
+        <div class="lift-row"><span class="lift-label">Rest between sets</span><span class="lift-val yellow">2–3 min</span></div>
+        <div class="lift-row"><span class="lift-label">Target RPE last set</span><span class="lift-val">8 (2 reps left)</span></div>
+        <div class="lift-row" style="border-bottom:none; padding-top:0.6rem;"><span class="lift-label" style="color:var(--text-muted); font-size:0.78rem; line-height:1.4;">Machine weight numbers are larger than free weight numbers — the leverage advantage inflates the plate count. What matters is the relative increase, not the absolute number. +10–20 lbs per jump is appropriate because machines allow larger increments without the stability demand of a barbell. Rotate between hack squat and leg press across cycles to vary the stimulus.</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Accessory progression note -->
+  <div class="card" style="border-left: 3px solid var(--text-faint);">
+    <h3>Accessory &amp; Core Progression</h3>
+    <p>All non-primary exercises follow the same double progression rule but with smaller increments. <strong>+5 lbs</strong> for upper body accessories (rows, pulldowns, incline press). <strong>+5–10 lbs</strong> for lower body accessories (leg curl, leg extension, single-leg press). <strong>+5 lbs or +1 rep</strong> for core exercises (cable crunch: add weight; dead bug: extend range of motion; bird dog: hold longer). The finisher progresses in load carried or rounds completed — add weight to the farmer carry handles every 2–3 weeks, or add a fourth round once three rounds feel manageable.</p>
+  </div>
+</div>
+
+
+<!-- ══════ RPE ══════ -->
+<div class="section">
+  <div class="label label-purple">Effort Calibration</div>
+  <h2>How Hard Should Each Set Feel? (RPE Scale)</h2>
+
+  <p>RPE — Rate of Perceived Exertion on a scale of 1–10 — tells you how many reps you had left in the tank when you stopped. It's how you know if the weight is right without testing your max. <strong>Never train to failure on compound movements.</strong> Failure under a heavy barbell at high body weight is an injury waiting to happen.</p>
+
+  <div class="rpe-bar">
+    <div class="rpe-seg" style="background: rgba(34,197,94,0.15); color: var(--green); font-size:0.65rem;">6<br>Easy</div>
+    <div class="rpe-seg" style="background: rgba(34,197,94,0.25); color: var(--green);">7</div>
+    <div class="rpe-seg" style="background: rgba(245,158,11,0.35); color: var(--yellow); font-size:0.65rem;">8<br>Target</div>
+    <div class="rpe-seg" style="background: rgba(220,38,38,0.30); color: var(--accent-light);">9</div>
+    <div class="rpe-seg" style="background: rgba(220,38,38,0.50); color: var(--accent-light); font-size:0.65rem;">10<br>Failure</div>
+  </div>
+
+  <div class="grid-2" style="margin-top: 0.85rem;">
+    <div class="card green">
+      <h3>RPE 7 or below on your last set → Too light</h3>
+      <p>You had 3+ reps left when you stopped. Don't wait for double progression — <strong>add weight next session</strong> without waiting to hit the top of the rep range. The weight is clearly not challenging enough to drive adaptation.</p>
+    </div>
+    <div class="card">
+      <h3>RPE 8 on your last set → Correct</h3>
+      <p>You stopped with 2 reps clearly still in you — you could have done 2 more but chose not to. This is the target for primary compound lifts on working sets. You're working hard enough to force adaptation without gambling on form breakdown.</p>
+    </div>
+    <div class="card yellow">
+      <h3>RPE 9 on your last set → Acceptable for accessories</h3>
+      <p>1 rep left. Acceptable on accessory exercises where the failure risk is low (leg curl machine, cable crunch, lat pulldown). Not the target for primary barbell movements where a missed rep creates a safety problem.</p>
+    </div>
+    <div class="card red">
+      <h3>RPE 10 → Failure. Back off.</h3>
+      <p>You could not complete the rep. This should <strong>never happen on primary compound lifts</strong>. If you reached failure on bench, squat, or deadlift, something went wrong — the jump was too large, form degraded, or you misjudged fatigue. Reduce weight 5–10% and rebuild.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════ REST PROTOCOL ══════ -->
+<div class="section">
+  <div class="label label-blue">Rest Protocol</div>
+  <h2>Exact Rest Periods by Exercise Type</h2>
+
+  <p>Rest periods are not flexible suggestions. For compound movements, insufficient rest directly reduces the weight you can move on the next set, which means you're training a fatigued system rather than a fresh one. For accessories, shorter rest drives metabolic stress — which contributes to fat loss. Each category has a specific protocol.</p>
+
+  <div class="card" style="padding: 0;">
+    <table class="rest-table">
+      <thead>
+        <tr>
+          <th>Exercise Type</th>
+          <th>Rest Period</th>
+          <th>Exercises</th>
+          <th>Why</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Primary Compound Lifts</strong></td>
+          <td><span class="rest-time">2–3 min</span></td>
+          <td style="color:var(--text-muted);">Bench, Trap Bar DL, OHP (primary), Leg Press, Hip Thrust</td>
+          <td>Full ATP-PCr system restoration is required to move maximum weight. Short rest here means you're lifting 80% of what you could lift — training harder than necessary to produce a weaker stimulus.</td>
+        </tr>
+        <tr>
+          <td><strong>Compound Accessories</strong></td>
+          <td><span class="rest-time">90 sec</span></td>
+          <td style="color:var(--text-muted);">Row (accessory), RDL, OHP (accessory sets), Lat Pulldown, Incline Press, Single-Leg Press</td>
+          <td>Enough recovery to perform quality sets, short enough to keep heart rate elevated. The sweet spot between strength and metabolic demand.</td>
+        </tr>
+        <tr>
+          <td><strong>Machine Isolation</strong></td>
+          <td><span class="rest-time">60 sec</span></td>
+          <td style="color:var(--text-muted);">Leg Curl, Leg Extension, Hip Abduction, Face Pull, Rear Delt</td>
+          <td>These are small muscle groups or low-load movements. Full recovery is unnecessary and just pads session time. 60 seconds keeps metabolic demand high.</td>
+        </tr>
+        <tr>
+          <td><strong>Core</strong></td>
+          <td><span class="rest-time">45–60 sec</span></td>
+          <td style="color:var(--text-muted);">Dead Bug, Pallof Press, Bird Dog, Cable Crunch, Ab Rollout</td>
+          <td>Core work is not limited by the ATP system — it's limited by neural fatigue and technique. 45–60 seconds is enough to reset form without allowing the core to fully disengage.</td>
+        </tr>
+        <tr>
+          <td><strong>Conditioning Finisher</strong></td>
+          <td><span class="rest-time">Full rest</span></td>
+          <td style="color:var(--text-muted);">Farmer Carries, Sled Push, Battle Ropes</td>
+          <td>These are max-effort conditioning rounds. Full rest between rounds is correct — the point is to push hard each round, not to accumulate fatigue across rounds. 90 seconds to 2 minutes between rounds. Each round is a sprint effort, not a grind.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ══════ BENCHMARK CALENDAR ══════ -->
+<div class="section">
+  <div class="label label-green">Benchmark Calendar</div>
+  <h2>What to Expect and When</h2>
+
+  <p>These benchmarks are relative increases from whatever weight you start at — not absolute numbers. The scale is a lagging and noisy indicator of progress. Strength on the four primary lifts, inches lost, and how you move are the leading indicators. Track all of them.</p>
+
+  <div class="timeline">
+
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-period">Days 1–30 · Adaptation Phase</div>
+      <div class="tl-title">Neural gains. Rapid strength increases. Scale may not budge.</div>
+      <div class="tl-body">Your nervous system is learning to recruit the muscle you already have. Strength jumps every single session in the first few weeks are normal — this is neural adaptation, not muscle growth. The scale often shows little change in this phase even as body composition improves because muscle and fat are trading places. Don't judge the program by the scale in the first month.</div>
+      <div class="tl-milestones">
+        <div class="tl-milestone"><strong>+15–25%</strong> on all four primaries from starting weight</div>
+        <div class="tl-milestone">Form on all core exercises feels controlled</div>
+        <div class="tl-milestone">Finisher rounds feel hard but completable</div>
+        <div class="tl-milestone">Sleep and recovery feel manageable</div>
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-period">Days 31–60 · Recomposition Begins</div>
+      <div class="tl-title">The mirror changes before the scale. Clothes start fitting differently.</div>
+      <div class="tl-body">This is where the visible shift begins. You're simultaneously losing fat and gaining muscle — which often means scale weight moves slowly while body composition changes significantly. Belt notches, shirt fit around the shoulders, how your face looks in the morning — these are the early signals. Strength continues to climb steadily. Progressive overload is working as designed.</div>
+      <div class="tl-milestones">
+        <div class="tl-milestone"><strong>+25–40%</strong> on all four primaries from starting weight</div>
+        <div class="tl-milestone">1 belt notch tighter</div>
+        <div class="tl-milestone">Farmer carry weight increased at least once</div>
+        <div class="tl-milestone">Core exercises feel significantly easier than week 1</div>
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-period">Days 61–90 · First Deload</div>
+      <div class="tl-title">Planned recovery. Strength rebounds higher after deload than before.</div>
+      <div class="tl-body">By week 8–10, accumulated fatigue is masking fitness gains. A deload week resets the system and allows the adaptations from the previous weeks to fully express. This is not rest — it's active recovery at reduced intensity. After the deload, most people set new personal records within 1–2 sessions. See the Deload Protocol section below.</div>
+      <div class="tl-milestones">
+        <div class="tl-milestone">Schedule deload at week 6, 8, or when motivation drops sharply</div>
+        <div class="tl-milestone">Post-deload PRs expected on all four primaries</div>
+        <div class="tl-milestone">Scale weight: expect 5–15 lbs down from start</div>
+      </div>
+    </div>
+
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-period">Days 91–180 · Compound Effect</div>
+      <div class="tl-title">Strength gains are now significant. Fat loss accelerates as metabolism shifts.</div>
+      <div class="tl-body">Six months of progressive overload means the four primary lifts are materially stronger than when you started. Each pound of added muscle tissue is burning 6–10 additional calories per day at rest — which compounds month over month. Fat loss rate often accelerates in this phase not because of increased gym effort but because your resting metabolic rate has genuinely increased. The program is doing what it was designed to do.</div>
+      <div class="tl-milestones">
+        <div class="tl-milestone"><strong>+50–80%</strong> on lower body primaries from start</div>
+        <div class="tl-milestone"><strong>+30–50%</strong> on upper body primaries from start</div>
+        <div class="tl-milestone">Scale weight: expect 20–40 lbs down from start with nutrition dialed</div>
+        <div class="tl-milestone">Trap bar DL approaching or exceeding body weight for clean reps</div>
+        <div class="tl-milestone">Single-leg press balanced between both legs</div>
+        <div class="tl-milestone">Two deloads completed, both followed by PRs</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ══════ DELOAD PROTOCOL ══════ -->
+<div class="section">
+  <div class="label label-yellow">Deload</div>
+  <h2>Scheduled Recovery — Every 6–8 Weeks</h2>
+
+  <p>A deload is a full training week at reduced weight. It is not optional and not a sign of weakness. Accumulated systemic fatigue eventually masks the fitness you've built — deloading strips the fatigue away and lets the adaptation surface. Every elite athlete deloads. It is part of the program, not a break from it.</p>
+
+  <div class="deload-grid">
+    <div class="card blue">
+      <h3>When to deload</h3>
+      <ul>
+        <li>Every 6–8 weeks on a schedule, regardless of how you feel</li>
+        <li>Any week where motivation to train has dropped sharply for 3+ days</li>
+        <li>Any week where joints feel achy or "grindy" rather than just muscle soreness</li>
+        <li>After a week where you failed reps that were previously easy</li>
+      </ul>
+    </div>
+    <div class="card blue">
+      <h3>How to deload</h3>
+      <ul>
+        <li>Train all four sessions as normal — same exercises, same structure</li>
+        <li>Reduce all weights to <strong>60–70%</strong> of your current working weight</li>
+        <li>Maintain the same rep ranges — reps should feel very easy</li>
+        <li>No finisher this week — end sessions after the core exercise</li>
+        <li>Focus entirely on form and movement quality at light load</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card green">
+    <h3>What happens after a deload</h3>
+    <p>Return to full working weights the following week. In most cases you will set a personal record within 1–2 sessions after the deload. The fitness built during the preceding 6–8 weeks was always there — the fatigue was hiding it. This is called supercompensation, and it's why the deload is not optional.</p>
+  </div>
+</div>
+
+
+<!-- ══════ STALL BREAKERS ══════ -->
+<div class="section">
+  <div class="label label-yellow">Stall Breakers</div>
+  <h2>When a Lift Stops Moving — In Order</h2>
+
+  <p>A stall is when you cannot add weight or reps after <strong>3 consecutive sessions</strong> at the same weight. Before assuming the program is broken, work through this checklist in order. The answer is almost always one of the first two items.</p>
+
+  <div class="stall-item">
+    <div class="stall-num">1</div>
+    <div>
+      <h3>Check sleep first</h3>
+      <p>Strength plateaus are caused by inadequate recovery before inadequate training stimulus — almost every time. If you're getting less than 7 hours per night, no programming change will fix the stall. Sleep is where muscle protein synthesis peaks. Fix sleep before touching anything else.</p>
+    </div>
+  </div>
+
+  <div class="stall-item">
+    <div class="stall-num">2</div>
+    <div>
+      <h3>Check protein intake</h3>
+      <p>The 180g/day floor exists for a reason. If you've been hitting 120–140g on most days and calling it close enough, this is where the stall is coming from. Your body cannot rebuild muscle tissue it does not have the raw material for. Log actual intake for a week — most people are surprised by how far short they fall.</p>
+    </div>
+  </div>
+
+  <div class="stall-item">
+    <div class="stall-num">3</div>
+    <div>
+      <h3>Take a deload week — even if one isn't scheduled</h3>
+      <p>If sleep and protein are both adequate and you're still stalled, accumulated fatigue is the likely culprit. Take a deload week immediately. Return to full weight the following week and try again. This solves 80% of stalls that aren't nutrition or sleep related.</p>
+    </div>
+  </div>
+
+  <div class="stall-item">
+    <div class="stall-num">4</div>
+    <div>
+      <h3>Drop weight 10%, rebuild</h3>
+      <p>After a deload, if you return and still cannot progress past the stall point: drop the weight 10% and rebuild using double progression from there. You will reach and surpass your previous best within 3–5 sessions. The brief backward step is faster than grinding at the stall point for another month.</p>
+    </div>
+  </div>
+
+  <div class="stall-item">
+    <div class="stall-num">5</div>
+    <div>
+      <h3>Switch the exercise variation</h3>
+      <p>If a specific stall has been resolved with steps 1–4 but keeps returning at the same weight ceiling, the movement may have run its course for now. On Lower A: switch from leg press to hack squat or vice versa. On Upper A: switch from barbell row to chest-supported row. The new stimulus often breaks the pattern while preserving the movement pattern and muscle group.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════ NON-NEGOTIABLES ══════ -->
+<div class="section">
+  <div class="label label-red">Non-Negotiables</div>
+  <h2>Five Rules That Override Everything Else</h2>
+
+  <div class="rule">
+    <div class="rule-n">1</div>
+    <div class="rule-body">
+      <h3>Progressive overload on the four primary lifts, always</h3>
+      <p>If the weight isn't going up over time on bench, OHP, trap bar deadlift, and leg press — nothing else in the program produces results. Every other section in this document exists to support this one rule executing correctly. Stalled lifts → run the stall breaker playbook above. Progressing lifts → everything else will follow.</p>
+    </div>
+  </div>
+
+  <div class="rule">
+    <div class="rule-n">2</div>
+    <div class="rule-body">
+      <h3>The conditioning finisher closes every session</h3>
+      <p>If short on time, cut an accessory exercise — not the finisher. The finisher is the calorie-burn component of each session. Removing it turns a 400-calorie session into a 280-calorie session. Carry weight, push the sled, or battle-rope for 8–10 minutes. Every single session.</p>
+    </div>
+  </div>
+
+  <div class="rule">
+    <div class="rule-n">3</div>
+    <div class="rule-body">
+      <h3>Walk 8,000–10,000 steps every day, including rest days</h3>
+      <p>At 380 lbs, daily walking at 10,000 steps burns roughly 900–1,200 calories. No resistance training session can match this consistent daily output. The gym builds muscle and drives EPOC. The walking burns fat between sessions. Both are required — neither replaces the other.</p>
+    </div>
+  </div>
+
+  <div class="rule">
+    <div class="rule-n">4</div>
+    <div class="rule-body">
+      <h3>180g protein per day is the floor, every day</h3>
+      <p>Body recomposition — losing fat while building muscle simultaneously — requires protein at or above this level. Hitting 180g on gym days and 120g on rest days averages to a number that isn't high enough. The protein target applies every day, independent of training. This is where most people's results diverge from their expectations.</p>
+    </div>
+  </div>
+
+  <div class="rule">
+    <div class="rule-n">5</div>
+    <div class="rule-body">
+      <h3>Deload every 6–8 weeks without negotiation</h3>
+      <p>The deload is scheduled, not reactive. It goes on the calendar the day the program starts. It is not taken because you're weak — it is taken because supercompensation requires it. The post-deload PR is the payoff. People who skip deloads hit walls that take months to recover from. People who take them keep progressing.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════ FOOTER ══════ -->
+<div class="footer">
+  <p><strong>Revision 2 — June 2026.</strong> Structure locked in Revision 1. Revision 2 adds: double progression loading system, per-lift progression cards, RPE calibration guide, exact rest period protocol, 30/60/90/180-day benchmark calendar, deload protocol, and stall-breaker playbook. Next revision: evaluate real-world session performance data — are sessions completing in time? Which exercises need variation swaps? Are the finisher loads appropriate?</p>
+</div>
+
+</body>
+</html>
