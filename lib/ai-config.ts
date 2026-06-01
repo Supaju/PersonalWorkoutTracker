@@ -8,26 +8,30 @@ export const AI_CONFIG = {
 
   training: {
     // One-liner goal shown to Claude in workout plan and review prompts.
-    goal: `Lose fat while building practical, functional muscle (NOT bodybuilding)`,
+    goal: `Lose fat as the primary objective. Build practical, functional muscle to support fat loss, improve daily life, and prepare for aging — NOT bodybuilding aesthetics`,
 
     // Target duration per session.
-    sessionLength: `~60 minutes`,
+    sessionLength: `~55-60 minutes (6 exercises, 20 sets total)`,
 
-    // Shown when no prior session exists for this template (first time through).
-    firstSessionGuidance: `Start conservatively — the user is 380 lbs and returning/starting a structured program. Err on the side of lighter weights that allow good form and full rep ranges.`,
+    // Shown when no prior session exists for this template (first time through.
+    firstSessionGuidance: `This is the first recorded session for this template. Start conservatively — select a weight the user can perform at the BOTTOM of the prescribed rep range with 2-3 reps clearly still in the tank (RPE 7, not RPE 10). The weight will feel easy. That is intentional. Double progression means the weight climbs naturally over weeks as strength builds. A conservative start is faster than an aggressive start that causes form breakdown or injury.`,
 
     // Shown when prior session data exists — drives week-over-week progression.
-    progressiveOverloadGuidance: `Apply progressive overload where appropriate. If a set was clearly too easy, increase weight 5-10 lbs. If the user struggled or failed reps, hold weight or reduce slightly.`,
+    progressiveOverloadGuidance: `Apply the double progression rule: examine the previous session's sets and reps. If ALL sets reached the TOP of the prescribed rep range last session, increase the weight by the prescribed increment (5 lbs for upper body, 10 lbs for lower body). If not all sets reached the top of the range, hold the weight and note in aiNotes that reps should continue climbing toward the top of the range. Never add weight just because the first set felt easy — all sets must complete the range first.`,
 
     // Evidence-based guidelines appended to every workout plan prompt.
-    // Add, remove, or edit lines here to change exercise selection and programming philosophy.
     guidelines: [
-      `At 380 lbs, prioritize exercises that minimize joint stress while maximizing metabolic output`,
-      `Compound movements burn more calories — favor them`,
-      `Rep range 8-14 with 60-90s rest keeps heart rate elevated for fat loss while building muscle`,
-      `Seated/supported variations reduce lower back strain where appropriate`,
-      `Progressive overload is the primary driver of change — track and advance weights over time`,
-      `Each session should feel challenging but completable — not form failure`,
+      `SESSION STRUCTURE: 6 exercises, 20 sets total — 2 primary lifts at 4 sets each, 4 accessory/core/finisher slots at 3 sets each. Do not add extra exercises or exceed this structure.`,
+      `DOUBLE PROGRESSION: Stay at a weight until all sets reach the top of the prescribed rep range. Then add weight (5 lbs upper, 10 lbs lower). Never add weight based on one easy set.`,
+      `RPE TARGETS: Primary compound lifts — last set should be RPE 8 (2 reps clearly remaining). Accessories — RPE 8-9. NEVER program to failure on barbell compound movements at this body weight.`,
+      `REST PERIODS: Primary compound lifts = 2-3 minutes. Compound accessories = 90 seconds. Isolation/machine accessories = 60 seconds. Core = 45-60 seconds. Finisher rounds = full rest between rounds.`,
+      `TRAP BAR PRIORITY: On Lower B, recommend Trap Bar Deadlift first. It keeps the load centered, allows a more upright torso, and dramatically reduces lumbar shear vs conventional deadlift. Conventional deadlift is a future goal as body weight decreases.`,
+      `NO ARM ISOLATION AS PRIMARY: Do not program bicep curls or tricep pushdowns as primary or standalone exercises. Arms are trained indirectly by all pressing (triceps) and pulling (biceps) movements. The shoulder health slot is for rear delts and rotator cuff — not curls.`,
+      `UPPER A IS HORIZONTAL, UPPER B IS VERTICAL: Upper A pairs horizontal push (bench) with horizontal pull (row). Upper B pairs vertical push (OHP) with vertical pull (lat pulldown). Respect this structure — it ensures all four major upper body movement patterns are covered each cycle.`,
+      `CONDITIONING FINISHER IS MANDATORY: Every session ends with the conditioning finisher slot. Do not skip it or substitute a strength exercise. Farmer carries and sled work on every day are the primary fat-loss contribution of the upper sessions.`,
+      `MACHINE VARIATIONS PREFERRED at this body weight for squat patterns — Hack Squat and Leg Press reduce lower back shear while preserving compound stimulus. Recommend barbell squat only when machine options are unavailable.`,
+      `SEATED OVERHEAD PRESS preferred over standing for lower back support until body weight decreases significantly.`,
+      `FUNCTIONAL STRENGTH FOCUS: Every exercise should translate to real-world demands — lifting, carrying, bending, stabilizing. Prioritize movement patterns over muscle aesthetics.`,
     ],
   },
 
@@ -45,7 +49,7 @@ export const AI_CONFIG = {
     activityMultiplier: 1.375,
 
     // Human-readable label for the activity level shown to Claude.
-    activityLabel: `light activity (4x/week lifting)`,
+    activityLabel: `light activity (3-4x/week lifting)`,
 
     // Macro priority guidance for meal planning.
     macroPriorities: `Prioritize protein and vegetables; moderate carbs around workouts; keep fat moderate`,
@@ -57,6 +61,6 @@ export const AI_CONFIG = {
   refine: {
     // Instruction appended to the system prompt for the revision endpoint.
     // Claude must return JSON with a "reply" (explanation) and full "exercises" list.
-    instruction: `When revising a workout plan based on user feedback, return ONLY valid JSON in this exact format: { "reply": "...", "exercises": [...] }. In "reply", explain in 2-4 sentences exactly what you changed and why. In "exercises", return the COMPLETE updated list — include every exercise, including unchanged ones, with all original fields intact (slot, muscleGroups, aiNotes, etc.).`,
+    instruction: `When revising a workout plan based on user feedback, return ONLY valid JSON in this exact format: { "reply": "...", "exercises": [...] }. In "reply", explain in 2-4 sentences exactly what you changed and why. In "exercises", return the COMPLETE updated list — include every exercise, including unchanged ones, with all original fields intact (slot, muscleGroups, aiNotes, etc.). Respect the session structure: 6 exercises, 20 total sets.`,
   },
 };

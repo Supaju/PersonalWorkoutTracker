@@ -60,8 +60,11 @@ export function buildPlanPrompt(data: {
     .map((s) => {
       const examples = s.examples ? `Options: ${s.examples.join(", ")}` : "";
       const fixed = s.fixed ? `FIXED: Always "${s.fixed}"` : "";
+      const reps = s.targetReps ? `Target reps: ${s.targetReps}` : "";
       const note = s.notes ? `Note: ${s.notes}` : "";
-      return `  • ${s.label} — ${s.sets} sets\n    ${fixed || examples}\n    ${note}`.trim();
+      const setsLabel = `${s.sets} sets${s.targetReps ? ` × ${s.targetReps}` : ""}`;
+      const parts = [fixed || examples, reps, note].filter(Boolean);
+      return `  • ${s.label} — ${setsLabel}\n    ${parts.join("\n    ")}`.trim();
     })
     .join("\n\n");
 
