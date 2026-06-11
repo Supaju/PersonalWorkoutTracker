@@ -197,7 +197,7 @@ export default function RecordSessionPage({ params }: { params: Promise<{ id: st
     await fetch("/api/cycle/advance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completedTemplate: session.template }),
+      body: JSON.stringify({ completedTemplate: session?.template }),
     });
     router.push(`/sessions/${id}`);
   };

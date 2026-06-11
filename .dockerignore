@@ -1,0 +1,35 @@
+# Version control
+.git
+.github
+.gitignore
+
+# Dependencies (rebuilt in Docker)
+node_modules
+
+# Next.js build output (rebuilt in Docker)
+.next
+
+# Local database files
+prisma/dev.db
+prisma/dev.db-journal
+prisma/*.db
+prisma/*.db-journal
+
+# Environment files — never bake secrets into image layers
+.env
+.env.local
+.env*.local
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Project docs and tooling
+docs
+.claude
+**/*.md

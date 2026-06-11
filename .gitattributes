@@ -1,0 +1,7 @@
+# Force shell scripts to LF in all environments
+*.sh text eol=lf
+
+# Docker files — keep LF for Linux
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+docker-compose*.yml text eol=lf

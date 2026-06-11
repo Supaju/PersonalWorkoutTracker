@@ -1,0 +1,16 @@
+services:
+  workout-tracker:
+    image: <your-dockerhub-username>/workout-tracker:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=file:/app/data/workout.db
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - USDA_API_KEY=${USDA_API_KEY}
+      - TAVILY_API_KEY=${TAVILY_API_KEY}
+    volumes:
+      - workout_data:/app/data
+    restart: always
+
+volumes:
+  workout_data:
