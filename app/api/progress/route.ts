@@ -6,8 +6,16 @@ const MUSCLE_GROUP_KEYWORDS: Record<string, string[]> = {
   chest: ["chest", "pec"],
   back: ["lat", "rhomboid", "trap", "row"],
   shoulders: ["delt", "shoulder"],
+  core: ["core", "ab", "abdominal", "oblique", "lumbar"],
   arms: ["bicep", "tricep", "forearm", "curl"],
 };
+
+const BENCHMARKS: { label: string; keywords: string[] }[] = [
+  { label: "Bench Press", keywords: ["barbell bench press", "flat bench"] },
+  { label: "Overhead Press", keywords: ["overhead press"] },
+  { label: "Trap Bar Deadlift", keywords: ["trap bar"] },
+  { label: "Squat / Leg Press", keywords: ["hack squat", "leg press", "squat machine", "smith machine squat"] },
+];
 
 function getMuscleGroup(muscleGroups: string): string {
   const lower = muscleGroups.toLowerCase();
@@ -41,6 +49,7 @@ export async function GET() {
     for (const session of sessions) {
       for (const ex of session.exercises) {
         if (ex.sets.length === 0) continue;
+        if (ex.slot === "finisher") continue;
 
         const key = ex.name.toLowerCase();
         if (!exerciseMap.has(key)) {
@@ -69,6 +78,13 @@ export async function GET() {
 
     const exercises = Array.from(exerciseMap.values());
 
+    const benchmarks = BENCHMARKS.map(({ label, keywords }) => {
+      const match = exercises.find((ex) =>
+        keywords.some((kw) => ex.name.toLowerCase().includes(kw))
+      );
+      return { label, exerciseName: match?.name ?? null, data: match?.data ?? null };
+    });
+
     const recentPRs = exercises
       .flatMap((ex) => {
         const latest = ex.data[ex.data.length - 1];
@@ -86,7 +102,7 @@ export async function GET() {
       .sort((a, b) => b.delta - a.delta)
       .slice(0, 4);
 
-    return NextResponse.json({ exercises, recentPRs });
+    return NextResponse.json({ exercises, recentPRs, benchmarks });
   } catch (err) {
     console.error("[progress] DB error", err);
     return NextResponse.json({ error: "Failed to load progress" }, { status: 500 });

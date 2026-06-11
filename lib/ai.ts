@@ -26,6 +26,7 @@ export function buildPlanPrompt(data: {
 }): { system: string; user: string } {
   const { profile, equipment, template, lastSameSession, lastAlternateLowerSession } = data;
   const tmpl = TEMPLATES[template];
+  const trainingGoal = AI_CONFIG.goalDescriptions.training[profile.goals] ?? AI_CONFIG.training.goal;
 
   const equipmentList =
     equipment.length > 0
@@ -77,7 +78,7 @@ export function buildPlanPrompt(data: {
 USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
-- Goal: ${AI_CONFIG.training.goal}
+- Goal: ${trainingGoal}
 - Target session length: ${AI_CONFIG.training.sessionLength}
 
 AVAILABLE EQUIPMENT:
@@ -118,6 +119,7 @@ export function buildMealPlanPrompt(data: {
   date: string;
 }): { system: string; user: string } {
   const { profile, foodItems, date } = data;
+  const nutritionGoal = AI_CONFIG.goalDescriptions.nutrition[profile.goals] ?? AI_CONFIG.nutrition.goal;
 
   const foodList = foodItems
     .map(
@@ -133,7 +135,7 @@ export function buildMealPlanPrompt(data: {
 USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
-- Goal: ${AI_CONFIG.nutrition.goal}
+- Goal: ${nutritionGoal}
 
 DATE: ${date}
 
@@ -177,6 +179,7 @@ export function buildDeviationPrompt(data: {
   date: string;
 }): { system: string; user: string } {
   const { profile, description, currentPlanTotals, date } = data;
+  const nutritionGoal = AI_CONFIG.goalDescriptions.nutrition[profile.goals] ?? AI_CONFIG.nutrition.goal;
 
   const planContext = currentPlanTotals
     ? `Their planned meals today already total: ${Math.round(currentPlanTotals.calories)} kcal | ${Math.round(currentPlanTotals.protein)}g protein | ${Math.round(currentPlanTotals.carbs)}g carbs | ${Math.round(currentPlanTotals.fat)}g fat`
@@ -187,7 +190,7 @@ export function buildDeviationPrompt(data: {
     user: `USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
-- Goal: ${AI_CONFIG.nutrition.goal}
+- Goal: ${nutritionGoal}
 - Approximate daily calorie target: Calculate TDEE (Mifflin-St Jeor, ${AI_CONFIG.nutrition.activityLabel} ${AI_CONFIG.nutrition.activityMultiplier}) minus ${AI_CONFIG.nutrition.deficitKcalRange} kcal deficit
 
 DATE: ${date}
@@ -220,6 +223,7 @@ export function buildReviewPrompt(data: {
   currentTemplate: TemplateId;
 }): { system: string; user: string } {
   const { profile, equipment, recentSessions, foodItems, mealPlan, currentTemplate } = data;
+  const trainingGoal = AI_CONFIG.goalDescriptions.training[profile.goals] ?? AI_CONFIG.training.goal;
 
   const equipmentSection =
     equipment.length > 0
@@ -263,7 +267,7 @@ export function buildReviewPrompt(data: {
     user: `USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
-- Goal: ${AI_CONFIG.training.goal}
+- Goal: ${trainingGoal}
 - Current cycle position: ${TEMPLATES[currentTemplate]?.label ?? currentTemplate} is next
 
 AVAILABLE EQUIPMENT:
@@ -279,17 +283,26 @@ ${mealSection}
 
 Review this program and provide structured feedback:
 
-## Program Structure
-Is the 4-day Upper A / Lower A / Upper B / Lower B rotation appropriate for this person's goals and current fitness level?
+## Primary Lift Progression — The Four Benchmarks
+Evaluate these four lifts specifically using the double progression rule: Flat Barbell Bench Press, Seated Overhead Press, Trap Bar Deadlift, and Hack Squat / Leg Press. For each lift present in the session data:
+- Did ALL sets reach the top of the prescribed rep range before weight was added? If weight went up but not all sets hit the ceiling, flag it.
+- Is the lift appearing in the correct session type (Bench → Upper A, OHP → Upper B, Trap Bar DL → Lower B, Squat pattern → Lower A)?
+- Are the loads conservative enough that form breakdown and injury are not a risk (RPE ≤ 8 — 2 reps clearly in the tank)?
+If a benchmark lift has no data yet, note that and explain what a conservative starting weight would look like.
 
-## Exercise Selection & Progressive Overload
-Are the exercises well-chosen for fat loss + practical strength at this body weight? Is progressive overload being applied correctly across sessions?
+## Program Execution
+Audit each session logged against the methodology:
+- **Finisher presence**: Every session (upper AND lower) must end with a conditioning finisher slot. Call out any session that is missing it.
+- **Core presence**: Every session must include a core slot. Call out any session that is missing it.
+- **Upper day structure**: Upper A primary slots must be Flat Bench (horizontal push) + a horizontal row. Upper B primary slots must be OHP (vertical push) + a lat pulldown / vertical pull. Flag violations.
+- **No arm isolation as primary**: If bicep curls or tricep pushdowns appear as a primary or standalone exercise slot (not as part of a finisher), flag it.
+- **Lower day variation**: Primary leg exercise and hip hinge must differ between Lower A and Lower B. Flag repeats.
 
 ## Nutrition
 Are the food choices supporting fat loss while preserving muscle? Assess protein adequacy (target: ~${AI_CONFIG.nutrition.proteinMinGrams}g/day).
 
 ## Overall Recommendations
-List 3–5 specific, actionable adjustments to improve results.`,
+List 3–5 specific, actionable adjustments prioritized by impact. Focus on execution gaps from the sections above — double progression violations, missing finishers, missing core slots, or benchmark lift concerns. Avoid generic advice.`,
   };
 }
 
@@ -308,6 +321,7 @@ export function buildNutritionChatPrompt(data: {
   date: string;
 }): { system: string } {
   const { profile, entries, foodItems, date } = data;
+  const nutritionGoal = AI_CONFIG.goalDescriptions.nutrition[profile.goals] ?? AI_CONFIG.nutrition.goal;
 
   // Calculate TDEE and targets (Mifflin-St Jeor)
   const weightKg = profile.weightLbs / 2.205;
@@ -358,7 +372,7 @@ export function buildNutritionChatPrompt(data: {
 
 Your role: conversational nutrition tracking assistant. The user describes food they ate; you log it and guide their day.
 
-Goal: ${AI_CONFIG.nutrition.goal}
+Goal: ${nutritionGoal}
 Macro priorities: ${AI_CONFIG.nutrition.macroPriorities}
 
 Today is ${date}. Food logged so far:

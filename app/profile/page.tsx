@@ -13,7 +13,7 @@ export default function ProfilePage() {
     heightFt: "",
     heightIn: "",
     weightLbs: "",
-    goals: "build_muscle",
+    goals: "lose_weight",
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -32,7 +32,7 @@ export default function ProfilePage() {
             heightFt: String(Math.floor(totalInches / 12) || ""),
             heightIn: String(totalInches % 12 || ""),
             weightLbs: String(data.weightLbs || ""),
-            goals: data.goals || "build_muscle",
+            goals: data.goals || "lose_weight",
           });
         }
         setLoading(false);

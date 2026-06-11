@@ -58,6 +58,25 @@ export const AI_CONFIG = {
     mealStructure: `Spread across breakfast, lunch, dinner, and one snack`,
   },
 
+  // Per-goal descriptions used by AI prompts — keyed by the Goal type from lib/types.ts.
+  // The lose_weight entries match the hardcoded training/nutrition.goal values above.
+  goalDescriptions: {
+    training: {
+      lose_weight: `Lose fat as the primary objective. Build practical, functional muscle to support fat loss, improve daily life, and prepare for aging — NOT bodybuilding aesthetics`,
+      build_muscle: `Build lean muscle mass as the primary objective. Prioritize progressive overload and hypertrophy across all major movement patterns. Maintain body composition.`,
+      improve_endurance: `Improve cardiovascular endurance and aerobic capacity as the primary objective. Preserve muscle mass and build a sustainable aerobic base.`,
+      maintain: `Maintain current fitness levels and body composition. Prevent regression while keeping training sustainable and enjoyable long-term.`,
+      athletic_performance: `Maximize athletic performance — strength, power, speed, and functional capacity as the primary objectives. Train movement patterns that transfer directly to real-world demands.`,
+    } as Record<string, string>,
+    nutrition: {
+      lose_weight: `Fat loss while preserving and building practical muscle`,
+      build_muscle: `Muscle gain with controlled fat accumulation — mild calorie surplus with high protein to minimize fat gain`,
+      improve_endurance: `Fuel training and recovery — adequate carbohydrates around sessions, high protein for muscle repair`,
+      maintain: `Maintenance calories with sufficient protein to preserve muscle and support training`,
+      athletic_performance: `Performance nutrition — high protein, strategic carbohydrates around training, controlled fat for sustained fuel`,
+    } as Record<string, string>,
+  },
+
   refine: {
     // Instruction appended to the system prompt for the revision endpoint.
     // Claude must return JSON with a "reply" (explanation) and full "exercises" list.

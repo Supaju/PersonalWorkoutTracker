@@ -31,17 +31,25 @@ type RecentPR = {
   delta: number;
 };
 
+type BenchmarkEntry = {
+  label: string;
+  exerciseName: string | null;
+  data: DataPoint[] | null;
+};
+
 type ProgressData = {
   exercises: ExerciseProgress[];
   recentPRs: RecentPR[];
+  benchmarks: BenchmarkEntry[];
 };
 
-const TAB_ORDER = ["legs", "chest", "back", "shoulders", "arms", "other"];
+const TAB_ORDER = ["legs", "chest", "back", "shoulders", "core", "arms", "other"];
 const TAB_LABELS: Record<string, string> = {
   legs: "Legs",
   chest: "Chest",
   back: "Back",
   shoulders: "Shoulders",
+  core: "Core",
   arms: "Arms",
   other: "Other",
 };
@@ -177,6 +185,65 @@ export default function ProgressPage() {
       <p className="text-[var(--color-text-faint)] text-sm mb-8">
         Max weight lifted per exercise over time.
       </p>
+
+      {/* Four Benchmarks */}
+      <div className="mb-8">
+        <h3 className="text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-3">
+          The Four Benchmarks
+        </h3>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {data.benchmarks.map((b) => {
+            const ex = b.exerciseName
+              ? data.exercises.find((e) => e.name === b.exerciseName)
+              : null;
+            const latest = b.data ? b.data[b.data.length - 1] : null;
+            const first = b.data ? b.data[0] : null;
+            return (
+              <button
+                key={b.label}
+                disabled={!ex}
+                onClick={() => {
+                  if (ex) {
+                    setActiveTab(ex.muscleGroup);
+                    setSelectedExercise(ex.name);
+                  }
+                }}
+                className={`bg-[var(--color-surface)] border border-[var(--color-border)] p-4 text-left ${
+                  ex
+                    ? "hover:border-[var(--color-accent)] transition-colors cursor-pointer"
+                    : "cursor-default opacity-60"
+                }`}
+              >
+                <p className="text-xs text-[var(--color-text-faint)] uppercase tracking-wider truncate">
+                  {b.label}
+                </p>
+                {latest ? (
+                  <>
+                    <p className="text-xl font-bold text-[var(--color-text)] mt-1">
+                      {latest.maxWeight}
+                      <span className="text-xs font-normal text-[var(--color-text-faint)]"> lbs</span>
+                    </p>
+                    <Sparkline data={b.data!} />
+                    <p className="text-xs mt-1">
+                      {first && latest.maxWeight > first.maxWeight ? (
+                        <span className="text-[#86efac]">
+                          ↑ +{latest.maxWeight - first.maxWeight} lbs since start
+                        </span>
+                      ) : (
+                        <span className="text-[var(--color-text-faint)]">
+                          {b.data!.length === 1 ? "1 session" : `${b.data!.length} sessions`}
+                        </span>
+                      )}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[var(--color-text-faint)] text-sm mt-3">Not yet recorded</p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Recent PRs strip */}
       {data.recentPRs.length > 0 && (
