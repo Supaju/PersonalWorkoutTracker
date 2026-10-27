@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { getAnthropic } from "@/lib/coach/anthropic";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { ZodType } from "zod";
 
@@ -10,21 +10,9 @@ export interface StructuredOpts<T> {
   maxTokens?: number;
 }
 
-// Module-level lazily initialized client
-let client: Anthropic | null = null;
-
-function getClient(): Anthropic {
-  if (!client) {
-    client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
-  }
-  return client;
-}
-
 export async function callStructured<T>(opts: StructuredOpts<T>): Promise<T> {
   const { model, system, user, schema, maxTokens } = opts;
-  const c = getClient();
+  const c = getAnthropic();
 
   // Retry once on any parse/validation failure; refusals and truncation are final.
   for (let attempt = 0; ; attempt++) {
@@ -47,15 +35,3 @@ export async function callStructured<T>(opts: StructuredOpts<T>): Promise<T> {
 }
 
 class Final extends Error {}
-
-// Test injection
-export function _setClientForTests(c: Pick<Anthropic, "messages"> | null): void {
-  if (c === null) {
-    client = null;
-  } else {
-    // Create a mock client with the injected messages
-    client = {
-      messages: c.messages,
-    } as Anthropic;
-  }
-}
