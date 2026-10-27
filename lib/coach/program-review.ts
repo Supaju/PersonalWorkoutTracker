@@ -2,7 +2,7 @@
 // CONTRACT: signatures fixed. Workstream C implements.
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { db } from "@/lib/db";
-import { anthropic } from "@/lib/ai";
+import { getAnthropic } from "./anthropic";
 import { TEMPLATES } from "@/lib/templates";
 import type { LoggedSession } from "./rules";
 import { MODELS, PHILOSOPHY, PROGRAM_REVIEW, DEFAULT_PERSONA } from "./philosophy";
@@ -263,7 +263,7 @@ export async function runProgramReview(
     ...PHILOSOPHY.weekly, ...PHILOSOPHY.load, ...PHILOSOPHY.safety,
   ].join("\n");
 
-  const res = await anthropic.messages.parse({
+  const res = await getAnthropic().messages.parse({
     model: MODELS.deep, max_tokens: 8000, system,
     messages: [{ role: "user", content: JSON.stringify(prompt) }],
     output_config: { format: zodOutputFormat(ProposalOut) },

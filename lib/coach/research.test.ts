@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vites
 vi.hoisted(() => { process.env.DATABASE_URL ??= "file:./test.db"; }); // prisma/test.db; never dev.db
 const create = vi.fn();
 const parse = vi.fn();
-vi.mock("@/lib/ai", () => ({ anthropic: { messages: { create: (...a: unknown[]) => create(...a), parse: (...a: unknown[]) => parse(...a) } } }));
+vi.mock("./anthropic", () => ({ getAnthropic: () => ({ messages: { create: (...a: unknown[]) => create(...a), parse: (...a: unknown[]) => parse(...a) } }) }));
 
 import { runResearch } from "./research";
 import { research } from "./engine";

@@ -2,7 +2,7 @@
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
-import { anthropic } from "@/lib/ai";
+import { getAnthropic } from "./anthropic";
 import { MODELS, PHILOSOPHY, DEFAULT_PERSONA } from "./philosophy";
 import { ResearchOut } from "./schemas";
 
@@ -59,7 +59,7 @@ export async function runResearch(
     const messages: Anthropic.MessageParam[] = [{ role: "user", content: userMsg }];
     let findings = "";
     for (let i = 0; i <= MAX_PAUSES; i++) {
-      const res = await anthropic.messages.create({
+      const res = await getAnthropic().messages.create({
         model: MODELS.deep, max_tokens: 4096, system, messages,
         tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 5 }],
       });
@@ -69,7 +69,7 @@ export async function runResearch(
       messages.push({ role: "assistant", content: res.content as Anthropic.ContentBlockParam[] });
     }
     const allowed = [...sources.values()];
-    const parsed = await anthropic.messages.parse({
+    const parsed = await getAnthropic().messages.parse({
       model: MODELS.deep, max_tokens: 2048, system,
       messages: [{
         role: "user",
@@ -80,7 +80,7 @@ export async function runResearch(
     note = ResearchOut.parse(parsed.parsed_output);
     note.sources = note.sources.filter((s) => sources.has(s.url));
   } else {
-    const parsed = await anthropic.messages.parse({
+    const parsed = await getAnthropic().messages.parse({
       model: MODELS.deep, max_tokens: 2048, system,
       messages: [{ role: "user", content: `${userMsg}\n\nAnswer from your own knowledge; no web search is available. Say that confidence is limited.` }],
       output_config: { format: zodOutputFormat(ResearchOut) },

@@ -10,7 +10,7 @@ import type { ProposalOut } from "./schemas";
 
 vi.hoisted(() => { process.env.DATABASE_URL ??= "file:./test.db"; }); // prisma/test.db; never dev.db
 const mockParse = vi.fn();
-vi.mock("@/lib/ai", () => ({ anthropic: { messages: { parse: (...a: unknown[]) => mockParse(...a) } } }));
+vi.mock("./anthropic", () => ({ getAnthropic: () => ({ messages: { parse: (...a: unknown[]) => mockParse(...a) } }) }));
 
 const base = (over: Partial<TrendInput>): TrendInput => ({
   today: "2026-12-07", history: [], trainingDays: [1, 2, 4, 5], currentPhase: "heavy_light_fullbody",
