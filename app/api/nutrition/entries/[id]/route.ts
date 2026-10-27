@@ -1,14 +1,18 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getClientId } from "@/lib/client";
 
 const VALID_SLOTS = new Set(["breakfast", "lunch", "dinner", "snack"]);
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const clientId = await getClientId();
   const { id } = await params;
   const body = await req.json();
   if (body.slot !== undefined && !VALID_SLOTS.has(body.slot)) {
     return NextResponse.json({ error: "Invalid slot." }, { status: 400 });
   }
+  const existing = await db.nutritionEntry.findFirst({ where: { id, clientId } });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   try {
     const entry = await db.nutritionEntry.update({
       where: { id },
@@ -28,7 +32,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const clientId = await getClientId();
   const { id } = await params;
+  const existing = await db.nutritionEntry.findFirst({ where: { id, clientId } });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
   try {
     await db.nutritionEntry.delete({ where: { id } });
     return NextResponse.json({ ok: true });

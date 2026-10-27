@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import { anthropic, buildNutritionChatPrompt } from "@/lib/ai";
 import { searchNutrition, searchWeb } from "@/lib/nutrition-api";
+import { getClientId } from "@/lib/client";
 import type { NutritionChat } from "@prisma/client";
 
 const VALID_SLOTS = new Set(["breakfast", "lunch", "dinner", "snack"]);
@@ -44,6 +45,7 @@ const tools: Anthropic.Tool[] = [
 ];
 
 export async function POST(req: Request) {
+  const clientId = await getClientId();
   let date: string, message: string;
   try {
     ({ date, message } = await req.json());
@@ -57,11 +59,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "date must be in YYYY-MM-DD format" }, { status: 400 });
   }
 
-  const [profile, entries, chatHistory, foodItems] = await Promise.all([
-    db.userProfile.findFirst(),
-    db.nutritionEntry.findMany({ where: { date }, orderBy: { createdAt: "asc" } }),
-    db.nutritionChat.findMany({ where: { date }, orderBy: { createdAt: "asc" } }),
+  const [profile, entries, chatHistory, foodItems, client] = await Promise.all([
+    db.userProfile.findUnique({ where: { clientId } }),
+    db.nutritionEntry.findMany({ where: { clientId, date }, orderBy: { createdAt: "asc" } }),
+    db.nutritionChat.findMany({ where: { clientId, date }, orderBy: { createdAt: "asc" } }),
     db.foodItem.findMany(),
+    db.client.findUniqueOrThrow({ where: { id: clientId }, select: { persona: true } }),
   ]);
 
   if (!profile) {
@@ -71,7 +74,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { system } = buildNutritionChatPrompt({ profile, entries, foodItems, date });
+  const { system } = buildNutritionChatPrompt({ profile, entries, foodItems, date, persona: client.persona });
 
   let messages: Anthropic.MessageParam[] = [
     ...chatHistory.map((m: NutritionChat) => ({
@@ -195,6 +198,7 @@ export async function POST(req: Request) {
       parsedEntries.map((e) =>
         db.nutritionEntry.create({
           data: {
+            clientId,
             date,
             slot: VALID_SLOTS.has(e.slot) ? e.slot : "snack",
             description: e.description,
@@ -210,8 +214,8 @@ export async function POST(req: Request) {
 
     await db.nutritionChat.createMany({
       data: [
-        { date, role: "user", content: message },
-        { date, role: "assistant", content: reply },
+        { clientId, date, role: "user", content: message },
+        { clientId, date, role: "assistant", content: reply },
       ],
     });
 
