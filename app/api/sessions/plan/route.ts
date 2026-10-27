@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getClientId } from "@/lib/client";
-import { parseBody, notFound } from "@/lib/api-util";
+import { parseBody, notFound, withAI } from "@/lib/api-util";
 import { planSession } from "@/lib/coach/engine";
 
 const Body = z.object({
@@ -16,5 +16,5 @@ export async function POST(req: Request) {
   const p = await parseBody(req, Body);
   if ("res" in p) return p.res;
   if (p.data.checkInId && !(await db.checkIn.findFirst({ where: { id: p.data.checkInId, clientId }, select: { id: true } }))) return notFound();
-  return NextResponse.json(await planSession(clientId, p.data));
+  return withAI(async () => NextResponse.json(await planSession(clientId, p.data)));
 }

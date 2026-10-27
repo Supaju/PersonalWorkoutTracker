@@ -1,4 +1,5 @@
 // Small helpers shared by API routes: validation, 404s, ownership checks. Every lookup filters by clientId.
+import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
 import type { ZodType } from "zod";
 import { db } from "@/lib/db";
@@ -22,3 +23,25 @@ export const ownedExercise = (clientId: string, sessionId: string, id: string) =
 
 /** Spread into a response of any edit to a session's sets/exercises: tells the UI to call /review again. */
 export const reReview = (s: { reviewedAt: Date | null }) => (s.reviewedAt ? { needsReReview: true } : {});
+
+/**
+ * Run a route body that calls the model; turn API failures into a readable JSON error instead of a bare 500.
+ * Anything that isn't an Anthropic API error is rethrown.
+ */
+export async function withAI(fn: () => Promise<Response>): Promise<Response> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (!(e instanceof Anthropic.APIError)) throw e;
+    console.error(e);
+    const msg = e.message ?? "";
+    const error = /credit balance/i.test(msg)
+      ? "The coach is unavailable: the Anthropic account is out of credits. Add credits in the Anthropic Console (Plans & Billing), then try again."
+      : e.status === 401
+      ? "The coach is unavailable: ANTHROPIC_API_KEY is missing or invalid."
+      : e.status === 429 || (e.status ?? 0) >= 500
+      ? "The coach is busy or temporarily unavailable. Try again in a minute."
+      : `The coach request failed (${e.status ?? "network"}).`;
+    return NextResponse.json({ error }, { status: 502 });
+  }
+}

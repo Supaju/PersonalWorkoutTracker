@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getClientId } from "@/lib/client";
-import { parseBody } from "@/lib/api-util";
+import { parseBody, withAI } from "@/lib/api-util";
 import { research } from "@/lib/coach/engine";
 
 export async function GET() {
@@ -14,5 +14,5 @@ export async function POST(req: Request) {
   const clientId = await getClientId();
   const p = await parseBody(req, z.object({ question: z.string().min(1) }));
   if ("res" in p) return p.res;
-  return NextResponse.json(await research(clientId, p.data.question));
+  return withAI(async () => NextResponse.json(await research(clientId, p.data.question)));
 }

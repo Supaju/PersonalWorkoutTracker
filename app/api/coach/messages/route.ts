@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getClientId } from "@/lib/client";
-import { parseBody, ownedSession, notFound } from "@/lib/api-util";
+import { parseBody, ownedSession, notFound, withAI } from "@/lib/api-util";
 import { handleMessage } from "@/lib/coach/conversation";
 
 /** GET ?limit=50 → oldest-first slice of the most recent messages. */
@@ -18,5 +18,5 @@ export async function POST(req: Request) {
   const p = await parseBody(req, z.object({ text: z.string().min(1), sessionId: z.string().optional() }));
   if ("res" in p) return p.res;
   if (p.data.sessionId && !(await ownedSession(clientId, p.data.sessionId))) return notFound();
-  return NextResponse.json(await handleMessage(clientId, p.data.text, { sessionId: p.data.sessionId }));
+  return withAI(async () => NextResponse.json(await handleMessage(clientId, p.data.text, { sessionId: p.data.sessionId })));
 }
