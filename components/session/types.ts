@@ -1,7 +1,8 @@
 // Client-side shapes of the session API responses plus small shared helpers. JSON dates arrive as strings.
-import type { PlannedSet, PlannedCardio, SessionPlan, SessionReview, SetType, LoadUnit } from "@/lib/coach/schemas";
+import type { PlannedSet, PlannedExercise, SessionPlan, SessionReview, SetType, LoadUnit } from "@/lib/coach/schemas";
 
-export type { PlannedSet, PlannedCardio, SessionPlan, SessionReview, SetType, LoadUnit };
+export type { PlannedSet, SessionPlan, SessionReview, SetType, LoadUnit };
+export type PlannedCardio = NonNullable<PlannedExercise["cardio"]>;
 
 export interface ApiSet {
   id: string; exerciseId: string; setNumber: number; setType: SetType;
