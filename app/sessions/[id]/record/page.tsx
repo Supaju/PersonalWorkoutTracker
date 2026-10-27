@@ -175,7 +175,7 @@ export default function RecordPage({ params }: { params: Promise<{ id: string }>
 
   return (
     <main className="mx-auto max-w-xl pb-28 text-[var(--color-text)]">
-      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2">
+      <header className="sticky top-[52px] md:top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <div className="truncate font-bold">{meta.name ?? "Workout"}</div>
