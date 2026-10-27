@@ -193,7 +193,7 @@ export function diffMutations(prev: LiveState, next: LiveState, mid: () => strin
     const was = pm.get(ex.id);
     const m = (x: Omit<Mutation, "id">) => out.push({ id: mid(), ...x });
     if (!was) {
-      m({ method: "POST", url: `${base(sid)}/exercises`, body: { name: ex.name, muscleGroups: ex.muscleGroups.split(",").map((g) => g.trim()).filter(Boolean), unit: ex.unit, block: ex.block }, bindTempId: ex.id });
+      m({ method: "POST", url: `${base(sid)}/exercises`, body: { id: ex.id.replace(/^tmp-/, ""), name: ex.name, muscleGroups: ex.muscleGroups.split(",").map((g) => g.trim()).filter(Boolean), unit: ex.unit, block: ex.block }, bindTempId: ex.id });
     } else {
       if (was.e.name !== ex.name) m({ key: `ex:${ex.id}:name`, method: "PATCH", url: `${base(sid)}/exercises/${ex.id}`, body: { name: ex.name, swappedFrom: ex.swappedFrom } });
       if (was.e.skipped !== ex.skipped || was.e.skipReason !== ex.skipReason) {

@@ -6,6 +6,7 @@ import { parseBody, ownedSession, notFound, reReview } from "@/lib/api-util";
 import { Block, LoadUnit } from "@/lib/coach/schemas";
 
 const Body = z.object({
+  id: z.string().min(1).optional(), // client-generated; makes retries idempotent
   name: z.string().min(1),
   muscleGroups: z.array(z.string()).default([]),
   unit: LoadUnit.default("total"),
@@ -20,10 +21,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if ("res" in p) return p.res;
   const session = await ownedSession(clientId, id);
   if (!session) return notFound();
+  if (p.data.id) {
+    const existing = await db.sessionExercise.findUnique({ where: { id: p.data.id } });
+    if (existing) return existing.sessionId === id ? NextResponse.json({ exercise: existing, ...reReview(session) }) : notFound();
+  }
   const last = await db.sessionExercise.aggregate({ where: { sessionId: id }, _max: { orderIndex: true } });
   const ex = await db.sessionExercise.create({
     data: {
-      sessionId: id, name: p.data.name, muscleGroups: p.data.muscleGroups.join(", "), unit: p.data.unit,
+      ...(p.data.id ? { id: p.data.id } : {}), sessionId: id, name: p.data.name, muscleGroups: p.data.muscleGroups.join(", "), unit: p.data.unit,
       block: p.data.block, added: true, orderIndex: (last._max.orderIndex ?? -1) + 1,
     },
   });

@@ -73,7 +73,7 @@ export async function runResearch(
     }
     const allowed = [...sources.values()];
     const parsed = await getAnthropic().messages.parse({
-      model: MODELS.deep, max_tokens: 2048, system,
+      model: MODELS.deep, max_tokens: 8192, system,
       messages: [{
         role: "user",
         content: `${userMsg}\n\nResearch findings:\n${findings}\n\nSources found by search (cite only these):\n${JSON.stringify(allowed)}\n\nWrite the structured research note.`,
@@ -84,7 +84,7 @@ export async function runResearch(
     note.sources = note.sources.filter((s) => sources.has(s.url));
   } else {
     const parsed = await getAnthropic().messages.parse({
-      model: MODELS.deep, max_tokens: 2048, system,
+      model: MODELS.deep, max_tokens: 8192, system,
       messages: [{ role: "user", content: `${userMsg}\n\nAnswer from your own knowledge; no web search is available. Say that confidence is limited.` }],
       output_config: { format: zodOutputFormat(ResearchOut) },
     });

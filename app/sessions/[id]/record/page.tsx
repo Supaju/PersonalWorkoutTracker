@@ -130,7 +130,8 @@ export default function RecordPage({ params }: { params: Promise<{ id: string }>
   const finish = async (d: CheckOutData) => {
     const q = queue.current; if (!q || !meta) return;
     setStage("finishing");
-    q.enqueue({ id: crypto.randomUUID(), method: "POST", url: "/api/checkins", body: { kind: "check_out", date: meta.date || todayStr(), sessionId: id, ...d } });
+    const checkOutId = crypto.randomUUID(); // same id on retry → server dedupes
+    q.enqueue({ id: checkOutId, method: "POST", url: "/api/checkins", body: { id: checkOutId, kind: "check_out", date: meta.date || todayStr(), sessionId: id, ...d } });
     q.enqueue({ id: crypto.randomUUID(), key: "phase", method: "PATCH", url: `/api/sessions/${id}`, body: { phase: "recorded", finishedAt: new Date().toISOString() } });
     reviewed.current = false;
     await q.flush();

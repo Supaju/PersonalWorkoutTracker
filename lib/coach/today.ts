@@ -40,10 +40,10 @@ export async function loadSchedule(clientId: string) {
   };
 }
 
-export async function createCheckIn(clientId: string, input: CheckInInput) {
+export async function createCheckIn(clientId: string, input: CheckInInput, id?: string) {
   return db.checkIn.create({
     data: {
-      clientId, kind: input.kind, date: input.date, sessionId: input.sessionId ?? null,
+      ...(id ? { id } : {}), clientId, kind: input.kind, date: input.date, sessionId: input.sessionId ?? null,
       soreness: input.soreness ? JSON.stringify(input.soreness) : null,
       sleep: input.sleep ?? null, energy: input.energy ?? null, minutesAvailable: input.minutesAvailable ?? null,
       painNotes: input.painNotes ?? null, effort: input.effort ?? null, enjoyment: input.enjoyment ?? null,

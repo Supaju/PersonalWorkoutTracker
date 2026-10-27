@@ -12,6 +12,7 @@ import * as sessionById from "./sessions/[id]/route";
 import * as setRoute from "./sessions/[id]/sets/[setId]/route";
 import * as prefs from "./preferences/route";
 import * as checkins from "./checkins/route";
+import * as addExercise from "./sessions/[id]/exercises/route";
 
 const json = (body: unknown, method = "POST") =>
   new Request("http://x/api", { method, body: JSON.stringify(body), headers: { "content-type": "application/json" } });
@@ -85,5 +86,18 @@ describe("client isolation", () => {
     expect(r.durationMin).toBeGreaterThanOrEqual(44);
     const put = await (await setRoute.PUT(json({ exerciseId: exId, setNumber: 3, reps: 5 }, "PUT"), p({ id: sessionId, setId: "set-late" }))).json();
     expect(put.needsReReview).toBe(true);
+  });
+  it("check-in and added-exercise POSTs with a client id are idempotent and client-scoped", async () => {
+    current = c1;
+    const ci = { id: "ci-retry-1", kind: "pre", date: "2026-10-27", sleep: "ok" };
+    expect((await (await checkins.POST(json(ci))).json()).id).toBe("ci-retry-1");
+    expect((await (await checkins.POST(json(ci))).json()).id).toBe("ci-retry-1");
+    expect(await db.checkIn.count({ where: { id: "ci-retry-1" } })).toBe(1);
+    const ex = { id: "ex-retry-1", name: "Sled Push", unit: "distance", block: "conditioning" };
+    await addExercise.POST(json(ex), p({ id: sessionId }));
+    await addExercise.POST(json(ex), p({ id: sessionId }));
+    expect(await db.sessionExercise.count({ where: { sessionId, name: "Sled Push" } })).toBe(1);
+    current = c2;
+    expect((await checkins.POST(json(ci))).status).toBe(404);
   });
 });

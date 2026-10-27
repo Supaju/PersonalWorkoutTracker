@@ -56,6 +56,11 @@ export function finalizePlan(
     });
     if (before > 0 && b.exercises.length === 0) emptied.push(b.block);
   }
+  // The client's history decides how load is expressed (e.g. farmer carry is per_hand, not distance).
+  for (const b of plan.blocks) for (const e of b.exercises) {
+    const h = exerciseHistory(ctx.history, e.name);
+    if (h.length && !e.cardio) e.unit = h[h.length - 1].exercise.unit;
+  }
   if (sessionType !== "reentry") {
     for (const b of plan.blocks) for (const e of b.exercises) {
       const d = decisionFor(ctx, e.name);

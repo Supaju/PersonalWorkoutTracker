@@ -137,6 +137,15 @@ describe("planSession", () => {
     expect((await db.checkIn.findUniqueOrThrow({ where: { id: ci.id } })).sessionId).toBe(sessionId);
   });
 
+  it("pins the unit to the exercise history so per-hand loads get deterministic targets", async () => {
+    const carry: PlannedExercise = { ...lift("Farmer Carry", null, [set("working", 1, 0)]), unit: "distance" };
+    mocked.mockResolvedValueOnce(planOf([...goodStrength(), carry]));
+    const { plan } = await planSession(CLIENT, { date: "2026-10-29" });
+    const fc = plan.blocks.flatMap((b) => b.exercises).find((e) => e.name === "Farmer Carry")!;
+    expect(fc.unit).toBe("per_hand");
+    expect(fc.sets.filter((s) => s.setType === "working").map((s) => s.weight)).toEqual([53]);
+  });
+
   it("shortens conditioning (not below 8 min) when ramp trimming is not enough", async () => {
     const raw = planOf([lift("Barbell Bench Press", null, [set("working", 1, 10)])]);
     const total = estimateDuration(raw).total;
