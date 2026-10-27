@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { anthropic, buildReviewPrompt } from "@/lib/ai";
+import { getClientId } from "@/lib/client";
 import type { TemplateId } from "@/lib/templates";
 
 export async function POST() {
-  const profile = await db.userProfile.findFirst();
+  const clientId = await getClientId();
+  const profile = await db.userProfile.findUnique({ where: { clientId } });
   if (!profile) {
     return NextResponse.json({ error: "No profile found. Please set up your profile first." }, { status: 400 });
   }
@@ -12,18 +14,19 @@ export async function POST() {
   const cycle = await db.cycleState.findUnique({ where: { id: "singleton" } });
   const currentTemplate = (cycle?.currentTemplate ?? "upper_b") as TemplateId;
 
-  const [equipment, recentSessions, foodItems] = await Promise.all([
-    db.equipment.findMany(),
+  const [equipment, recentSessions, foodItems, client] = await Promise.all([
+    db.equipment.findMany({ where: { clientId } }),
     db.workoutSession.findMany({
       include: { exercises: { include: { sets: true }, orderBy: { orderIndex: "asc" } } },
       orderBy: { createdAt: "desc" },
       take: 8,
     }),
     db.foodItem.findMany({ orderBy: { name: "asc" } }),
+    db.client.findUniqueOrThrow({ where: { id: clientId }, select: { persona: true } }),
   ]);
 
   const today = new Date().toISOString().split("T")[0];
-  const mealPlan = await db.mealPlan.findUnique({ where: { date: today } });
+  const mealPlan = await db.mealPlan.findUnique({ where: { clientId_date: { clientId, date: today } } });
 
   const prompt = buildReviewPrompt({
     profile,
@@ -32,6 +35,7 @@ export async function POST() {
     foodItems,
     mealPlan,
     currentTemplate,
+    persona: client.persona,
   });
 
   const stream = await anthropic.messages.stream({
@@ -51,7 +55,7 @@ export async function POST() {
           controller.enqueue(encoder.encode(chunk.delta.text));
         }
       }
-      await db.aIReview.create({ data: { reviewText: fullText, category: "overall" } });
+      await db.aIReview.create({ data: { clientId, reviewText: fullText, category: "overall" } });
       controller.close();
     },
   });
@@ -62,6 +66,7 @@ export async function POST() {
 }
 
 export async function GET() {
-  const reviews = await db.aIReview.findMany({ orderBy: { createdAt: "desc" }, take: 10 });
+  const clientId = await getClientId();
+  const reviews = await db.aIReview.findMany({ where: { clientId }, orderBy: { createdAt: "desc" }, take: 10 });
   return NextResponse.json(reviews);
 }

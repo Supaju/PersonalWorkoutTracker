@@ -1,88 +1,61 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
+import { getClientId } from "@/lib/client";
+import { parseBody, ownedSession, notFound } from "@/lib/api-util";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+type Ctx = { params: Promise<{ id: string }> };
+
+export async function GET(_req: Request, { params }: Ctx) {
+  const clientId = await getClientId();
   const { id } = await params;
-  const session = await db.workoutSession.findUnique({
-    where: { id },
-    include: { exercises: { include: { sets: { orderBy: { setNumber: "asc" } } }, orderBy: { orderIndex: "asc" } } },
+  const session = await db.workoutSession.findFirst({
+    where: { id, clientId },
+    include: {
+      exercises: {
+        include: { sets: { orderBy: { setNumber: "asc" } }, cardio: true, feedback: true },
+        orderBy: { orderIndex: "asc" },
+      },
+      questions: true,
+      checkIns: true,
+    },
   });
-  if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  return NextResponse.json(session);
+  return session ? NextResponse.json(session) : notFound();
 }
 
-export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+const Patch = z.object({
+  phase: z.enum(["planned", "active", "recorded"]).optional(),
+  startedAt: z.string().datetime({ offset: true }).optional(),
+  finishedAt: z.string().datetime({ offset: true }).optional(),
+  durationMin: z.number().int().positive().optional(),
+  notes: z.string().optional(),
+});
+
+export async function PATCH(req: Request, { params }: Ctx) {
+  const clientId = await getClientId();
   const { id } = await params;
-  const body = await req.json();
-  const { action } = body;
-
-  if (action === "add_sets") {
-    const { exerciseId, sets } = body;
-    await db.setLog.deleteMany({ where: { exerciseId } });
-    await db.setLog.createMany({
-      data: sets.map((s: { setNumber: number; weightLbs: number; reps: number }) => ({
-        exerciseId,
-        setNumber: s.setNumber,
-        weightLbs: s.weightLbs,
-        reps: s.reps,
-      })),
-    });
-    return NextResponse.json({ ok: true });
+  const p = await parseBody(req, Patch);
+  if ("res" in p) return p.res;
+  const cur = await ownedSession(clientId, id);
+  if (!cur) return notFound();
+  const { startedAt, finishedAt, ...rest } = p.data;
+  const data: Record<string, unknown> = { ...rest };
+  if (startedAt) data.startedAt = new Date(startedAt);
+  if (finishedAt) data.finishedAt = new Date(finishedAt);
+  if (rest.phase === "active" && !cur.startedAt && !startedAt) data.startedAt = new Date();
+  if (rest.phase === "recorded") {
+    const fin = (data.finishedAt as Date | undefined) ?? cur.finishedAt ?? new Date();
+    data.finishedAt = fin;
+    const start = (data.startedAt as Date | undefined) ?? cur.startedAt;
+    if (!cur.durationMin && !rest.durationMin && start) data.durationMin = Math.max(1, Math.round((+fin - +start) / 60000));
   }
-
-  if (action === "mark_recorded") {
-    const { durationMin, notes } = body;
-    const session = await db.workoutSession.update({
-      where: { id },
-      data: { phase: "recorded", durationMin: durationMin ?? null, notes: notes ?? null },
-    });
-    return NextResponse.json(session);
-  }
-
-  if (action === "update_exercise") {
-    const { exerciseId, name, muscleGroups, targetSets, targetReps, targetWeight, aiNotes } = body;
-    const ex = await db.sessionExercise.update({
-      where: { id: exerciseId },
-      data: {
-        name,
-        muscleGroups: muscleGroups ?? "",
-        targetSets: Number(targetSets),
-        targetReps,
-        targetWeight: targetWeight ? Number(targetWeight) : null,
-        aiNotes: aiNotes ?? null,
-      },
-    });
-    return NextResponse.json(ex);
-  }
-
-  if (action === "remove_exercise") {
-    const { exerciseId } = body;
-    await db.sessionExercise.delete({ where: { id: exerciseId } });
-    return NextResponse.json({ ok: true });
-  }
-
-  if (action === "add_exercise") {
-    const { name, muscleGroups, targetSets, targetReps, targetWeight, slot, orderIndex } = body;
-    const ex = await db.sessionExercise.create({
-      data: {
-        sessionId: id,
-        slot: slot ?? "custom",
-        name,
-        muscleGroups: muscleGroups ?? "",
-        targetSets: Number(targetSets),
-        targetReps,
-        targetWeight: targetWeight ? Number(targetWeight) : null,
-        orderIndex: Number(orderIndex),
-      },
-    });
-    return NextResponse.json(ex);
-  }
-
-  return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+  const updated = await db.workoutSession.update({ where: { id }, data });
+  return NextResponse.json({ ...updated, ...(cur.reviewedAt && (rest.notes !== undefined || rest.durationMin) ? { needsReReview: true } : {}) });
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(_req: Request, { params }: Ctx) {
+  const clientId = await getClientId();
   const { id } = await params;
-  await db.workoutSession.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+  const { count } = await db.workoutSession.deleteMany({ where: { id, clientId } });
+  return count ? NextResponse.json({ ok: true }) : notFound();
 }
