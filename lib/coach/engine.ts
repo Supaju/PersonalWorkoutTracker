@@ -42,5 +42,5 @@ export async function answerQuestion(
 export async function research(
   clientId: string, question: string, link?: { proposalId?: string; sessionId?: string },
 ): Promise<{ researchNoteId: string | null; note: ResearchOut; searched: boolean }> {
-  throw new Error("not implemented");
+  return (await import("./research")).runResearch(clientId, question, link);
 }
