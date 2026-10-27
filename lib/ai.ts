@@ -117,8 +117,9 @@ export function buildMealPlanPrompt(data: {
   profile: UserProfile;
   foodItems: FoodItem[];
   date: string;
+  persona: string;
 }): { system: string; user: string } {
-  const { profile, foodItems, date } = data;
+  const { profile, foodItems, date, persona } = data;
   const nutritionGoal = AI_CONFIG.goalDescriptions.nutrition[profile.goals] ?? AI_CONFIG.nutrition.goal;
 
   const foodList = foodItems
@@ -129,7 +130,7 @@ export function buildMealPlanPrompt(data: {
     .join("\n");
 
   return {
-    system: `You are a sports nutritionist who knows macros and body composition inside out. ${AI_CONFIG.persona}`,
+    system: `You are a sports nutritionist who knows macros and body composition inside out. ${persona}`,
     user: `Create a daily meal plan. Use ONLY the foods listed below.
 
 USER PROFILE:
@@ -177,8 +178,9 @@ export function buildDeviationPrompt(data: {
   description: string;
   currentPlanTotals: { calories: number; protein: number; carbs: number; fat: number } | null;
   date: string;
+  persona: string;
 }): { system: string; user: string } {
-  const { profile, description, currentPlanTotals, date } = data;
+  const { profile, description, currentPlanTotals, date, persona } = data;
   const nutritionGoal = AI_CONFIG.goalDescriptions.nutrition[profile.goals] ?? AI_CONFIG.nutrition.goal;
 
   const planContext = currentPlanTotals
@@ -186,7 +188,7 @@ export function buildDeviationPrompt(data: {
     : "No meal plan has been logged yet for today.";
 
   return {
-    system: `You are a sports nutritionist helping someone understand how their food choices fit their goals. ${AI_CONFIG.persona}`,
+    system: `You are a sports nutritionist helping someone understand how their food choices fit their goals. ${persona}`,
     user: `USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
@@ -221,8 +223,9 @@ export function buildReviewPrompt(data: {
   foodItems: FoodItem[];
   mealPlan: MealPlan | null;
   currentTemplate: TemplateId;
+  persona: string;
 }): { system: string; user: string } {
-  const { profile, equipment, recentSessions, foodItems, mealPlan, currentTemplate } = data;
+  const { profile, equipment, recentSessions, foodItems, mealPlan, currentTemplate, persona } = data;
   const trainingGoal = AI_CONFIG.goalDescriptions.training[profile.goals] ?? AI_CONFIG.training.goal;
 
   const equipmentSection =
@@ -263,7 +266,7 @@ export function buildReviewPrompt(data: {
   const mealSection = mealPlan ? `Today's meal plan:\n${mealPlan.meals}` : "No meal plan for today.";
 
   return {
-    system: `You are a certified personal trainer and sports nutritionist reviewing a client's program. Be direct, specific, and constructive. ${AI_CONFIG.persona}`,
+    system: `You are a certified personal trainer and sports nutritionist reviewing a client's program. Be direct, specific, and constructive. ${persona}`,
     user: `USER PROFILE:
 - Age: ${profile.age}, Gender: ${profile.gender}
 - Height: ${formatHeight(profile.heightIn)}, Weight: ${profile.weightLbs} lbs
@@ -319,8 +322,9 @@ export function buildNutritionChatPrompt(data: {
   entries: NutritionEntry[];
   foodItems: FoodItem[];
   date: string;
+  persona: string;
 }): { system: string } {
-  const { profile, entries, foodItems, date } = data;
+  const { profile, entries, foodItems, date, persona } = data;
   const nutritionGoal = AI_CONFIG.goalDescriptions.nutrition[profile.goals] ?? AI_CONFIG.nutrition.goal;
 
   // Calculate TDEE and targets (Mifflin-St Jeor)
@@ -368,7 +372,7 @@ export function buildNutritionChatPrompt(data: {
           .join("\n")
       : "No foods in library.";
 
-  const system = `${AI_CONFIG.persona}
+  const system = `${persona}
 
 Your role: conversational nutrition tracking assistant. The user describes food they ate; you log it and guide their day.
 

@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getClientId } from "@/lib/client";
 
 const VALID_SLOTS = ["breakfast", "lunch", "dinner", "snack"] as const;
 
 export async function POST(req: Request) {
+  const clientId = await getClientId();
   const { date, slot, description, calories, protein, carbs, fat } = await req.json();
   if (!date || !slot || !description) {
     return NextResponse.json({ error: "date, slot, and description are required" }, { status: 400 });
@@ -14,6 +16,7 @@ export async function POST(req: Request) {
   try {
     const entry = await db.nutritionEntry.create({
       data: {
+        clientId,
         date,
         slot,
         description,
