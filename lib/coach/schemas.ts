@@ -199,5 +199,6 @@ export const CoachAction = z.discriminatedUnion("type", [
   z.object({ type: z.literal("proposal_created"), proposalId: z.string() }),
   z.object({ type: z.literal("research_saved"), researchNoteId: z.string() }),
   z.object({ type: z.literal("checkin_saved"), checkInId: z.string() }),
+  z.object({ type: z.literal("question_answered"), questionId: z.string(), sessionId: z.string() }),
 ]);
 export type CoachAction = z.infer<typeof CoachAction>;

@@ -91,9 +91,12 @@ const TOOLS: Record<string, { description: string; schema: z.ZodType; run: (c: C
     description: "Submit the client's answer to one of your pending clarifying questions.",
     schema: z.object({ questionId: z.string(), answer: z.string() }),
     run: async (c, i: { questionId: string; answer: string }) => {
-      const q = await db.clarifyingQuestion.findFirst({ where: { id: i.questionId, session: { clientId: c.clientId } }, select: { id: true } });
+      const q = await db.clarifyingQuestion.findFirst({ where: { id: i.questionId, session: { clientId: c.clientId } }, select: { id: true, sessionId: true } });
       if (!q) throw new Error("Question not found");
-      return { result: await answerQuestion(c.clientId, i.questionId, i.answer) }; // no CoachAction variant exists for this
+      return {
+        result: await answerQuestion(c.clientId, i.questionId, i.answer),
+        action: { type: "question_answered", questionId: q.id, sessionId: q.sessionId },
+      };
     },
   },
   start_program_review: {
@@ -169,6 +172,7 @@ const LABEL: Record<CoachAction["type"], string> = {
   plan_created: "created today's plan", plan_updated: "updated the plan", preference_saved: "saved a preference",
   schedule_updated: "updated your schedule", consideration_saved: "saved a note about you", review_created: "reviewed the session",
   proposal_created: "started a program review", research_saved: "saved a research note", checkin_saved: "saved your check-in",
+  question_answered: "updated next targets from your answer",
 };
 
 // ─── Entry point ─────────────────────────────────────────────────────────────

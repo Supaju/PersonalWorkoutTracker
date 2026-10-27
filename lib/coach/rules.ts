@@ -27,6 +27,7 @@ export interface LoggedExercise {
 
 export interface LoggedSession {
   date: string; // YYYY-MM-DD
+  name?: string | null;
   sessionType: SessionType | "legacy" | string;
   phase: "planned" | "active" | "recorded";
   exercises: LoggedExercise[];

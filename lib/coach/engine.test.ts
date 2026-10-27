@@ -136,6 +136,18 @@ describe("planSession", () => {
     expect(ex("Seated Hamstring Curl").sets.filter((s) => s.setType === "ramp").length).toBeLessThan(2);
     expect((await db.checkIn.findUniqueOrThrow({ where: { id: ci.id } })).sessionId).toBe(sessionId);
   });
+
+  it("shortens conditioning (not below 8 min) when ramp trimming is not enough", async () => {
+    const raw = planOf([lift("Barbell Bench Press", null, [set("working", 1, 10)])]);
+    const total = estimateDuration(raw).total;
+    const ci = await db.checkIn.create({ data: { clientId: CLIENT, kind: "pre", date: "2026-10-29", minutesAvailable: total - 2 } });
+    mocked.mockResolvedValueOnce(raw);
+    const { plan } = await planSession(CLIENT, { date: "2026-10-29", checkInId: ci.id });
+    const cond = plan.blocks.find((b) => b.block === "conditioning")!;
+    expect(plan.estimatedMinutes).toBeLessThanOrEqual(total - 2);
+    expect(cond.exercises[0].cardio!.minutes).toBe(8);
+    expect(cond.estimatedMinutes).toBeGreaterThanOrEqual(8);
+  });
 });
 
 describe("refinePlan", () => {

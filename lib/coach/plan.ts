@@ -1,7 +1,7 @@
 // planSession / refinePlan: rules decide the facts, the model writes the plan, rules overwrite anything numeric.
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { MODELS } from "./philosophy";
+import { MODELS, SESSION } from "./philosophy";
 import { buildContext, exerciseHistory, type CoachContext } from "./context";
 import { callStructured } from "./llm";
 import { buildPlanPrompt, buildRefinePrompt, type PlanFacts } from "./prompts";
@@ -77,6 +77,17 @@ export function finalizePlan(
       while (plan.estimatedMinutes > minutesAvailable && e.sets.some((s) => s.setType === "ramp")) {
         e.sets.splice(e.sets.findIndex((s) => s.setType === "ramp"), 1);
         recompute();
+      }
+    }
+    // Still over: shorten cardio in conditioning, then warm-up, down to their minimum block lengths.
+    for (const [block, min] of [["conditioning", SESSION.blockMinutes.conditioning[0]], ["warmup", SESSION.blockMinutes.warmup[0]]] as const) {
+      const b = plan.blocks.find((x) => x.block === block);
+      for (const e of b?.exercises ?? []) {
+        if (!e.cardio) continue;
+        const over = plan.estimatedMinutes - minutesAvailable;
+        const others = (b!.estimatedMinutes ?? 0) - e.cardio.minutes;
+        const cut = Math.min(over, e.cardio.minutes - Math.max(1, min - others));
+        if (cut > 0) { e.cardio.minutes -= cut; recompute(); }
       }
     }
   }

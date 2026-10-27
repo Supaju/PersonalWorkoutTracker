@@ -186,7 +186,7 @@ model WorkoutSession {
   finishedAt       DateTime?
   notes            String?
   coachNotes       String? // why today looks like this (1–2 sentences)
-  plan             String? // JSON SessionPlan snapshot as first generated (planned vs actual)
+  plan             String? // JSON SessionPlan as last agreed (after refine); planned-vs-actual compares against this
   coachReview      String? // JSON SessionReview
   reviewedAt       DateTime?
   planningChat     String? // legacy; migrated into CoachMessage, do not write
