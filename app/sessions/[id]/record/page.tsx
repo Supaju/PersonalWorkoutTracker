@@ -1,520 +1,249 @@
 "use client";
+// Live record mode: one exercise in focus, everything saved through the offline queue as you go.
+import { use, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { createQueue, loadSnapshot, pendingCount, saveSnapshot, type OfflineQueue } from "@/lib/offline-queue";
+import { diffMutations, fromSession, liveReducer, type LiveAction, type LiveExercise, type LiveState } from "@/lib/live-session";
+import { pairLabels, parseReview, todayStr, type ApiQuestion, type ApiSession, type Preference, type SessionReview } from "@/components/session/types";
+import ExerciseCard from "@/components/session/ExerciseCard";
+import FeedbackSheet from "@/components/session/FeedbackSheet";
+import CheckOutSheet, { type CheckOutData } from "@/components/session/CheckOutSheet";
+import ReviewPanel from "@/components/session/ReviewPanel";
+import { AddExerciseSheet, SkipSheet, SwapSheet } from "@/components/session/ActionSheets";
+import { btn, btnAccent } from "@/components/session/ui";
 
-import { useState, useEffect, use } from "react";
-import { useRouter } from "next/navigation";
-import { TEMPLATES, TEMPLATE_COLORS, type TemplateId } from "@/lib/templates";
-import type { WorkoutSession, SessionExercise, SetLog } from "@prisma/client";
+interface Meta { name: string | null; date: string; phase: string; startedAt: string | null; reviewed: boolean; hasConditioning: boolean; lastBw: number | null }
+type Open = { kind: "skip" | "swap" | "tag"; ex: string } | { kind: "add" } | null;
 
-type FullSession = WorkoutSession & {
-  exercises: (SessionExercise & { sets: SetLog[] })[];
-};
+const mmss = (sec: number) => `${Math.floor(Math.max(0, sec) / 60)}:${String(Math.max(0, sec) % 60).padStart(2, "0")}`;
 
-type SetEntry = { weightLbs: string; reps: string };
-
-type EditDraft = {
-  name: string;
-  muscleGroups: string;
-  targetSets: string;
-  targetReps: string;
-  targetWeight: string;
-};
-
-const blankDraft = (): EditDraft => ({
-  name: "",
-  muscleGroups: "",
-  targetSets: "3",
-  targetReps: "10-12",
-  targetWeight: "",
-});
-
-function draftFromExercise(ex: SessionExercise): EditDraft {
-  return {
-    name: ex.name,
-    muscleGroups: ex.muscleGroups,
-    targetSets: String(ex.targetSets),
-    targetReps: ex.targetReps,
-    targetWeight: ex.targetWeight ? String(ex.targetWeight) : "",
-  };
+function beep() {
+  try {
+    const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx(); const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination); o.frequency.value = 880; g.gain.value = 0.15;
+    o.start(); o.stop(ctx.currentTime + 0.35);
+  } catch { /* no audio */ }
 }
 
-export default function RecordSessionPage({ params }: { params: Promise<{ id: string }> }) {
+export default function RecordPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const router = useRouter();
-  const [session, setSession] = useState<FullSession | null>(null);
-  const [setData, setSetData] = useState<Record<string, SetEntry[]>>({});
-  const [duration, setDuration] = useState("");
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState<Record<string, boolean>>({});
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<EditDraft>(blankDraft());
-  const [addingNew, setAddingNew] = useState(false);
-  const [newDraft, setNewDraft] = useState<EditDraft>(blankDraft());
-  const [submitting, setSubmitting] = useState(false);
+  const [live, setLive] = useState<LiveState | null>(null);
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [prefs, setPrefs] = useState<Preference[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+  const [sync, setSync] = useState({ pending: 0, offline: false });
+  const [open, setOpen] = useState<Open>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [stage, setStage] = useState<"live" | "checkout" | "finishing" | "review">("live");
+  const [review, setReview] = useState<{ review: SessionReview; questions: ApiQuestion[] } | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const liveRef = useRef<LiveState | null>(null);
+  const queue = useRef<OfflineQueue | null>(null);
+  const reviewed = useRef(false);
+  const reReview = useRef<() => void>(() => {});
+  const beeped = useRef(0);
 
+  const runReview = useCallback(async () => {
+    setUpdating(true);
+    try {
+      const r = await fetch(`/api/sessions/${id}/review`, { method: "POST" });
+      if (!r.ok) throw new Error(String(r.status));
+      const rev = (await r.json()) as SessionReview;
+      const s = (await (await fetch(`/api/sessions/${id}`, { cache: "no-store" })).json()) as ApiSession;
+      reviewed.current = true;
+      setReview({ review: rev, questions: s.questions ?? [] });
+      setErr(null);
+    } catch { setErr("Couldn't get the coach review yet. Your workout is saved; try again."); }
+    finally { setUpdating(false); }
+  }, [id]);
+  reReview.current = () => { if (reviewed.current) void runReview(); };
+
+  // Load: server state, unless unsent local edits exist (then the local snapshot is the truth).
   useEffect(() => {
-    fetchSession();
+    const q = createQueue(id, {
+      onChange: (s) => setSync({ pending: s.pending, offline: s.offline }),
+      onReReview: () => reReview.current(),
+      onDrop: (_m, status) => setErr(`One change was rejected by the server (${status}).`),
+    });
+    queue.current = q;
+    let alive = true;
+    (async () => {
+      let session: ApiSession | null = null;
+      try {
+        const r = await fetch(`/api/sessions/${id}`, { cache: "no-store" });
+        if (r.status === 404) { setErr("Session not found."); return; }
+        if (r.ok) session = (await r.json()) as ApiSession;
+      } catch { /* offline: fall back to the snapshot */ }
+      fetch("/api/preferences").then((r) => r.json()).then((p) => alive && setPrefs(p)).catch(() => {});
+      const snap = pendingCount(id) > 0 ? loadSnapshot<{ state: LiveState; meta: Meta }>(id) : null;
+      if (snap) { liveRef.current = snap.state; setLive(snap.state); setMeta(snap.meta); return; }
+      if (!session) { setErr("Can't load this session. Check your connection."); return; }
+      const state = fromSession(session);
+      const rev = parseReview(session);
+      reviewed.current = !!session.reviewedAt;
+      const lastBw = null;
+      setMeta({
+        name: session.name, date: session.date, phase: session.phase, reviewed: !!session.reviewedAt, lastBw,
+        startedAt: session.startedAt ?? (session.phase === "planned" ? new Date().toISOString() : null),
+        hasConditioning: session.exercises.some((e) => e.block === "conditioning" || e.unit === "cardio"),
+      });
+      liveRef.current = state; setLive(state);
+      if (session.phase === "planned") q.enqueue({ id: crypto.randomUUID(), key: "phase", method: "PATCH", url: `/api/sessions/${id}`, body: { phase: "active" } });
+      if (session.phase === "recorded" && rev) setReview({ review: rev, questions: session.questions ?? [] });
+    })();
+    const stop = q.start();
+    return () => { alive = false; stop(); };
   }, [id]);
 
-  const fetchSession = () =>
-    fetch(`/api/sessions/${id}`)
-      .then((r) => r.json())
-      .then((s: FullSession) => {
-        setSession(s);
-        setNotes(s.notes ?? "");
-        const initial: Record<string, SetEntry[]> = {};
-        for (const ex of s.exercises) {
-          initial[ex.id] =
-            ex.sets.length > 0
-              ? ex.sets.map((st) => ({ weightLbs: String(st.weightLbs), reps: String(st.reps) }))
-              : Array.from({ length: ex.targetSets }, () => ({
-                  weightLbs: ex.targetWeight ? String(ex.targetWeight) : "",
-                  reps: ex.targetReps.includes("-") ? ex.targetReps.split("-")[1] : ex.targetReps,
-                }));
-        }
-        setSetData((prev) => {
-          const merged: Record<string, SetEntry[]> = { ...initial };
-          for (const key of Object.keys(prev)) {
-            if (merged[key]) merged[key] = prev[key];
-          }
-          return merged;
-        });
-      });
+  useEffect(() => { if (live && meta) saveSnapshot(id, { state: live, meta }); }, [id, live, meta]);
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  useEffect(() => { // keep the screen awake between sets
+    let lock: { release: () => Promise<void> } | null = null;
+    const get = async () => { try { lock = await (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<{ release: () => Promise<void> }> } }).wakeLock?.request("screen") ?? null; } catch { /* unsupported */ } };
+    void get();
+    const vis = () => { if (document.visibilityState === "visible") void get(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { document.removeEventListener("visibilitychange", vis); void lock?.release().catch(() => {}); };
+  }, []);
 
-  const updateSet = (exId: string, setIdx: number, field: "weightLbs" | "reps", val: string) => {
-    setSetData((prev) => {
-      const copy = [...(prev[exId] ?? [])];
-      copy[setIdx] = { ...copy[setIdx], [field]: val };
-      return { ...prev, [exId]: copy };
-    });
-  };
+  const act = useCallback((a: LiveAction) => {
+    const prev = liveRef.current;
+    if (!prev) return;
+    const next = liveReducer(prev, a);
+    if (next === prev) return;
+    liveRef.current = next; setLive(next);
+    for (const m of diffMutations(prev, next)) queue.current?.enqueue(m);
+  }, []);
 
-  const addSet = (exId: string) => {
-    setSetData((prev) => ({
-      ...prev,
-      [exId]: [...(prev[exId] ?? []), { weightLbs: "", reps: "" }],
-    }));
-  };
-
-  const removeSet = (exId: string, setIdx: number) => {
-    setSetData((prev) => ({
-      ...prev,
-      [exId]: (prev[exId] ?? []).filter((_, i) => i !== setIdx),
-    }));
-  };
-
-  const saveSets = async (exId: string) => {
-    const sets = (setData[exId] ?? [])
-      .filter((s) => s.weightLbs !== "" && s.reps !== "")
-      .map((s, i) => ({ setNumber: i + 1, weightLbs: Number(s.weightLbs), reps: Number(s.reps) }));
-    await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "add_sets", exerciseId: exId, sets }),
-    });
-    setSaved((prev) => ({ ...prev, [exId]: true }));
-    setTimeout(() => setSaved((prev) => ({ ...prev, [exId]: false })), 2000);
-  };
-
-  const startEdit = (ex: SessionExercise) => {
-    setEditingId(ex.id);
-    setEditDraft(draftFromExercise(ex));
-    setAddingNew(false);
-  };
-
-  const cancelEdit = () => {
-    setEditingId(null);
-  };
-
-  const saveEdit = async () => {
-    if (!editingId || !editDraft.name.trim()) return;
-    setSubmitting(true);
-    await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "update_exercise",
-        exerciseId: editingId,
-        ...editDraft,
-        targetSets: Number(editDraft.targetSets),
-        targetWeight: editDraft.targetWeight ? Number(editDraft.targetWeight) : null,
-      }),
-    });
-    setEditingId(null);
-    setSubmitting(false);
-    await fetchSession();
-  };
-
-  const removeExercise = async (exId: string) => {
-    if (!confirm("Remove this exercise from the session?")) return;
-    setSubmitting(true);
-    await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "remove_exercise", exerciseId: exId }),
-    });
-    setEditingId(null);
-    setSubmitting(false);
-    setSetData((prev) => {
-      const copy = { ...prev };
-      delete copy[exId];
-      return copy;
-    });
-    await fetchSession();
-  };
-
-  const addExercise = async () => {
-    if (!newDraft.name.trim()) return;
-    setSubmitting(true);
-    const orderIndex = (session?.exercises.length ?? 0);
-    await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "add_exercise",
-        ...newDraft,
-        targetSets: Number(newDraft.targetSets),
-        targetWeight: newDraft.targetWeight ? Number(newDraft.targetWeight) : null,
-        orderIndex,
-      }),
-    });
-    setNewDraft(blankDraft());
-    setAddingNew(false);
-    setSubmitting(false);
-    await fetchSession();
-  };
-
-  const finishSession = async () => {
-    setSaving(true);
-    for (const ex of session?.exercises ?? []) {
-      await saveSets(ex.id);
+  // Rest timer end: buzz, beep, clear.
+  const restEnd = live?.rest?.endsAt ?? 0;
+  useEffect(() => {
+    if (restEnd && now >= restEnd && beeped.current !== restEnd) {
+      beeped.current = restEnd;
+      try { navigator.vibrate?.([250, 120, 250]); } catch { /* unsupported */ }
+      beep();
+      act({ t: "clearRest" });
     }
-    await fetch(`/api/sessions/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "mark_recorded", durationMin: duration ? Number(duration) : null, notes }),
-    });
-    await fetch("/api/cycle/advance", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completedTemplate: session?.template }),
-    });
-    router.push(`/sessions/${id}`);
+  }, [now, restEnd, act]);
+
+  const finish = async (d: CheckOutData) => {
+    const q = queue.current; if (!q || !meta) return;
+    setStage("finishing");
+    q.enqueue({ id: crypto.randomUUID(), method: "POST", url: "/api/checkins", body: { kind: "check_out", date: meta.date || todayStr(), sessionId: id, ...d } });
+    q.enqueue({ id: crypto.randomUUID(), key: "phase", method: "PATCH", url: `/api/sessions/${id}`, body: { phase: "recorded", finishedAt: new Date().toISOString() } });
+    reviewed.current = false;
+    await q.flush();
+    while (q.pending() > 0) await new Promise((r) => setTimeout(r, 1500)); // offline: stays saved on this phone and finishes on reconnect
+    await runReview();
+    setStage("review");
   };
 
-  if (!session) return <div className="text-[var(--color-text-faint)] text-sm">Loading...</div>;
+  if (err && !live) return <main className="mx-auto max-w-xl p-4"><p role="alert">{err}</p><Link className="underline" href="/sessions">Back to sessions</Link></main>;
+  if (!live || !meta) return <main className="mx-auto max-w-xl p-4 text-[var(--color-text-muted)]">Loading…</main>;
 
-  const label = TEMPLATES[session.template as TemplateId]?.label ?? session.template;
-  const colorClass = TEMPLATE_COLORS[session.template as TemplateId] ?? "bg-[var(--color-surface)] text-[var(--color-text-muted)]";
+  if (stage === "finishing" || stage === "review") {
+    return (
+      <main className="mx-auto max-w-xl space-y-4 p-4 pb-12 text-[var(--color-text)]">
+        <h1 className="text-2xl font-bold">{stage === "review" && review ? "Nice work" : "Wrapping up…"}</h1>
+        {sync.pending > 0 && <p className="rounded-xl border border-[var(--color-border)] p-3 text-sm">Saved on this phone. {sync.offline ? "Waiting for a connection" : "Sending"} ({sync.pending} left).</p>}
+        {stage === "finishing" && !review && <p className="text-[var(--color-text-muted)]">{updating ? "Your coach is reviewing the session…" : "Saving your workout…"}</p>}
+        {err && <p role="alert" className="text-sm">{err} <button className="underline" onClick={() => void runReview()}>Retry</button></p>}
+        {review && <ReviewPanel review={review.review} questions={review.questions} updating={updating} />}
+        {stage === "review" && <Link href={`/sessions/${id}`} className={`${btnAccent} flex w-full items-center justify-center`}>Done</Link>}
+      </main>
+    );
+  }
+
+  const exs = live.exercises;
+  const labels = pairLabels(exs);
+  const cur = exs[live.current];
+  const next = exs.slice(live.current + 1).find((e) => !e.skipped);
+  const elapsed = meta.startedAt ? Math.floor((now - +new Date(meta.startedAt)) / 1000) : 0;
+  const restLeft = live.rest ? Math.max(0, Math.ceil((live.rest.endsAt - now) / 1000)) : 0;
+  const unlogged = exs.filter((e) => !e.skipped).reduce((n, e) => n + (e.cardio ? (e.cardio.done ? 0 : 1) : e.sets.filter((s) => !s.done).length), 0);
+  const target = open && open.kind !== "add" ? exs.find((e) => e.id === open.ex) : null;
+
+  const addExercise = (name: string) => {
+    const e: LiveExercise = {
+      id: `tmp-${crypto.randomUUID()}`, name, muscleGroups: "", block: "strength", pairGroup: null, unit: "total", restSec: 90, cue: null,
+      whyTarget: null, added: true, swappedFrom: null, skipped: false, skipReason: null, cardio: null, tags: [],
+      sets: [{ id: crypto.randomUUID(), setType: "working", weightLbs: null, reps: null, rir: null, durationSec: null, distanceYd: null, done: false, targetRir: null }],
+    };
+    act({ t: "addExercise", exercise: e });
+  };
 
   return (
-    <div>
-      <div className="flex items-center gap-3 mb-1">
-        <h2 className="text-2xl font-bold text-[var(--color-text)] uppercase tracking-wide">Record Session</h2>
-        <span className={`text-xs font-bold px-3 py-1 ${colorClass}`}>{label}</span>
-        <span className="text-sm text-[var(--color-text-faint)]">{session.date}</span>
-      </div>
-      <p className="text-[var(--color-text-faint)] text-sm mb-6">Log your actual sets and reps. Use the edit button to swap or remove any exercise.</p>
-
-      {session.notes && (
-        <div className="bg-[#110a1a] border border-[#2a1a3a] p-4 mb-6">
-          <p className="text-xs font-bold text-[#c4b5fd] mb-1 uppercase tracking-widest">Coach Notes</p>
-          <p className="text-sm text-[#c4b5fd]">{session.notes}</p>
-        </div>
-      )}
-
-      <div className="space-y-6 mb-8">
-        {session.exercises.map((ex) => {
-          const sets = setData[ex.id] ?? [];
-          const isEditing = editingId === ex.id;
-          return (
-            <div key={ex.id} className="bg-[var(--color-surface)] border border-[var(--color-border)] p-6">
-              <div className="flex items-start justify-between mb-1">
-                <div>
-                  <h3 className="font-bold text-[var(--color-text)]">{ex.name}</h3>
-                  <p className="text-xs text-[var(--color-text-faint)] mt-0.5">
-                    Target: {ex.targetSets} × {ex.targetReps}{ex.targetWeight ? ` @ ${ex.targetWeight} lbs` : ""}
-                    {ex.muscleGroups ? ` · ${ex.muscleGroups}` : ""}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  {!isEditing && (
-                    <button
-                      onClick={() => startEdit(ex)}
-                      className="text-xs font-medium px-3 py-1.5 bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)] transition-colors"
-                    >
-                      Edit
-                    </button>
-                  )}
-                  {!isEditing && (
-                    <button
-                      onClick={() => saveSets(ex.id)}
-                      className={`text-xs font-medium px-3 py-1.5 transition-colors ${
-                        saved[ex.id]
-                          ? "bg-[#0a1a0a] text-[#86efac] border border-[#1a3a1a]"
-                          : "bg-[var(--color-bg)] border border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-text)]"
-                      }`}
-                    >
-                      {saved[ex.id] ? "Saved ✓" : "Save Sets"}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {ex.aiNotes && !isEditing && (
-                <p className="text-xs text-[var(--color-text-faint)] italic mb-3">{ex.aiNotes}</p>
-              )}
-
-              {isEditing && (
-                <div className="mt-3 mb-4 p-4 bg-[var(--color-bg)] border border-[var(--color-border)] space-y-3">
-                  <p className="text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest">Edit Exercise</p>
-                  <div>
-                    <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Exercise name</label>
-                    <input
-                      type="text"
-                      value={editDraft.name}
-                      onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
-                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                      placeholder="e.g. Leg Press"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Muscle groups</label>
-                    <input
-                      type="text"
-                      value={editDraft.muscleGroups}
-                      onChange={(e) => setEditDraft((d) => ({ ...d, muscleGroups: e.target.value }))}
-                      className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                      placeholder="e.g. Quads, glutes"
-                    />
-                  </div>
-                  <div className="flex gap-3">
-                    <div>
-                      <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Sets</label>
-                      <input
-                        type="number"
-                        value={editDraft.targetSets}
-                        onChange={(e) => setEditDraft((d) => ({ ...d, targetSets: e.target.value }))}
-                        className="w-20 bg-[var(--color-surface)] border border-[var(--color-border)] px-3 py-2 text-sm text-center text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Rep range</label>
-                      <input
-                        type="text"
-                        value={editDraft.targetReps}
-                        onChange={(e) => setEditDraft((d) => ({ ...d, targetReps: e.target.value }))}
-                        className="w-24 bg-[var(--color-surface)] border border-[var(--color-border)] px-3 py-2 text-sm text-center text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                        placeholder="10-12"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Target weight (lbs)</label>
-                      <input
-                        type="number"
-                        value={editDraft.targetWeight}
-                        onChange={(e) => setEditDraft((d) => ({ ...d, targetWeight: e.target.value }))}
-                        className="w-28 bg-[var(--color-surface)] border border-[var(--color-border)] px-3 py-2 text-sm text-center text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                        placeholder="optional"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      onClick={saveEdit}
-                      disabled={submitting || !editDraft.name.trim()}
-                      className="btn-accent text-xs"
-                    >
-                      {submitting ? "Saving..." : "Save Changes"}
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="text-xs px-4 py-2 border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => removeExercise(ex.id)}
-                      disabled={submitting}
-                      className="text-xs px-4 py-2 bg-[#1a0505] border border-[#3a1010] text-[#f87171] hover:bg-[#2a0808] disabled:opacity-50 transition-colors ml-auto"
-                    >
-                      Remove Exercise
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {!isEditing && (
-                <div className="mt-3 space-y-2">
-                  {sets.map((s, si) => (
-                    <div key={si} className="flex items-center gap-2">
-                      <span className="text-xs text-[var(--color-text-faint)] w-10 shrink-0">Set {si + 1}</span>
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          placeholder="0"
-                          value={s.weightLbs}
-                          onChange={(e) => updateSet(ex.id, si, "weightLbs", e.target.value)}
-                          className="w-20 bg-[var(--color-bg)] border border-[var(--color-border)] px-2 py-1.5 text-sm text-center text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                        />
-                        <span className="text-xs text-[var(--color-text-faint)]">lbs</span>
-                      </div>
-                      <span className="text-[var(--color-border)]">×</span>
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="number"
-                          placeholder="0"
-                          value={s.reps}
-                          onChange={(e) => updateSet(ex.id, si, "reps", e.target.value)}
-                          className="w-16 bg-[var(--color-bg)] border border-[var(--color-border)] px-2 py-1.5 text-sm text-center text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                        />
-                        <span className="text-xs text-[var(--color-text-faint)]">reps</span>
-                      </div>
-                      <button
-                        onClick={() => removeSet(ex.id, si)}
-                        className="text-[var(--color-text-faint)] hover:text-[var(--color-accent)] transition-colors ml-1"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    onClick={() => addSet(ex.id)}
-                    className="text-xs text-[var(--color-accent)] hover:text-[var(--color-accent-hover)] font-medium mt-1"
-                  >
-                    + Add set
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Add new exercise */}
-        {addingNew ? (
-          <div className="bg-[var(--color-surface)] border border-dashed border-[var(--color-border)] p-6 space-y-3">
-            <p className="text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest">Add Exercise</p>
-            <div>
-              <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Exercise name</label>
-              <input
-                type="text"
-                value={newDraft.name}
-                onChange={(e) => setNewDraft((d) => ({ ...d, name: e.target.value }))}
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                placeholder="e.g. Cable Row"
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Muscle groups</label>
-              <input
-                type="text"
-                value={newDraft.muscleGroups}
-                onChange={(e) => setNewDraft((d) => ({ ...d, muscleGroups: e.target.value }))}
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                placeholder="e.g. Lats, biceps"
-              />
-            </div>
-            <div className="flex gap-3">
-              <div>
-                <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Sets</label>
-                <input
-                  type="number"
-                  value={newDraft.targetSets}
-                  onChange={(e) => setNewDraft((d) => ({ ...d, targetSets: e.target.value }))}
-                  className="w-20 bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-center text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Rep range</label>
-                <input
-                  type="text"
-                  value={newDraft.targetReps}
-                  onChange={(e) => setNewDraft((d) => ({ ...d, targetReps: e.target.value }))}
-                  className="w-24 bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-center text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                  placeholder="10-12"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-[var(--color-text-faint)] mb-1 block uppercase tracking-wider">Target weight (lbs)</label>
-                <input
-                  type="number"
-                  value={newDraft.targetWeight}
-                  onChange={(e) => setNewDraft((d) => ({ ...d, targetWeight: e.target.value }))}
-                  className="w-28 bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 text-sm text-center text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-                  placeholder="optional"
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 pt-1">
-              <button
-                onClick={addExercise}
-                disabled={submitting || !newDraft.name.trim()}
-                className="btn-accent text-xs"
-              >
-                {submitting ? "Adding..." : "Add to Session"}
-              </button>
-              <button
-                onClick={() => { setAddingNew(false); setNewDraft(blankDraft()); }}
-                className="text-xs px-4 py-2 border border-[var(--color-border)] text-[var(--color-text-muted)] hover:bg-[var(--color-surface)] transition-colors"
-              >
-                Cancel
-              </button>
+    <main className="mx-auto max-w-xl pb-28 text-[var(--color-text)]">
+      <header className="sticky top-0 z-30 border-b border-[var(--color-border)] bg-[var(--color-bg)] px-4 py-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <div className="truncate font-bold">{meta.name ?? "Workout"}</div>
+            <div className="text-xs text-[var(--color-text-muted)]">
+              {mmss(elapsed)} elapsed ·{" "}
+              <span role="status">{sync.pending === 0 ? "Saved" : sync.offline ? `Offline, ${sync.pending} saved on phone` : `Saving ${sync.pending}…`}</span>
             </div>
           </div>
-        ) : (
-          <button
-            onClick={() => { setAddingNew(true); setEditingId(null); }}
-            className="w-full py-3 border border-dashed border-[var(--color-border)] text-sm text-[var(--color-text-faint)] hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors"
-          >
-            + Add an exercise
+          <button type="button" className={`${btnAccent} px-4`} onClick={() => { if (unlogged === 0 || window.confirm(`${unlogged} set${unlogged === 1 ? "" : "s"} not logged. Finish anyway?`)) setStage("checkout"); }}>Finish</button>
+        </div>
+        {live.rest && (
+          <div className="mt-2 flex items-center gap-2 rounded-xl border-2 border-[var(--color-accent)] p-2" role="timer" aria-label="Rest timer">
+            <div className="flex-1 text-3xl font-bold tabular-nums">Rest {mmss(restLeft)}</div>
+            <button type="button" className={`${btn} px-3 text-sm`} onClick={() => act({ t: "addRest", sec: 30, now: Date.now() })}>+30s</button>
+            <button type="button" className={`${btn} px-3 text-sm`} onClick={() => act({ t: "clearRest" })}>Skip</button>
+          </div>
+        )}
+      </header>
+
+      <div className="space-y-4 px-4 pt-4">
+        {err && <p role="alert" className="rounded-xl border border-[var(--color-border)] p-3 text-sm">{err} <button className="underline" onClick={() => setErr(null)}>Dismiss</button></p>}
+        {meta.phase === "recorded" && (
+          <div className="rounded-xl border border-[var(--color-border)] p-3 text-sm">
+            Editing a finished workout. Changes save as you go.{" "}
+            <button className="underline" onClick={() => void runReview()}>{meta.reviewed || review ? "Update coach review" : "Get coach review"}</button>
+            {updating && " Updating…"}
+          </div>
+        )}
+        {cur && (
+          <ExerciseCard key={cur.id} ex={cur} label={labels[live.current]} act={act} canUp={live.current > 0} canDown={live.current < exs.length - 1}
+            onSkip={() => setOpen({ kind: "skip", ex: cur.id })} onSwap={() => setOpen({ kind: "swap", ex: cur.id })} onTag={() => setOpen({ kind: "tag", ex: cur.id })} />
+        )}
+        {next && (
+          <button type="button" className={`${btn} flex w-full items-center justify-between px-4 text-left`} onClick={() => act({ t: "focus", index: exs.indexOf(next) })}>
+            <span><span className="text-xs uppercase tracking-wide text-[var(--color-text-faint)]">Up next</span><br />{labels[exs.indexOf(next)] ? `${labels[exs.indexOf(next)]} · ` : ""}{next.name}</span>
+            <span aria-hidden>›</span>
           </button>
         )}
+        <details className="rounded-xl border border-[var(--color-border)]">
+          <summary className="flex min-h-[48px] cursor-pointer items-center px-4 font-bold">All exercises ({exs.length})</summary>
+          <ul className="divide-y divide-[var(--color-border)]">
+            {exs.map((e, i) => {
+              const done = e.cardio ? e.cardio.done : e.sets.length > 0 && e.sets.every((s) => s.done);
+              return (
+                <li key={e.id}>
+                  <button type="button" className="flex min-h-[48px] w-full items-center justify-between px-4 text-left" onClick={() => act({ t: "focus", index: i })}>
+                    <span className={i === live.current ? "font-bold" : ""}>{labels[i] ? `${labels[i]} · ` : ""}{e.name}</span>
+                    <span className="text-xs text-[var(--color-text-muted)]">{e.skipped ? `skipped${e.skipReason ? ` (${e.skipReason})` : ""}` : done ? "done" : ""}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+        <button type="button" className={`${btn} w-full`} onClick={() => setOpen({ kind: "add" })}>+ Add exercise</button>
+        <p className="text-center text-xs text-[var(--color-text-faint)]"><Link href={`/sessions/${id}`} className="underline">Plan view</Link> · <Link href={`/sessions/${id}/print`} className="underline">Print sheet</Link></p>
       </div>
 
-      <div className="bg-[var(--color-surface)] border border-[var(--color-border)] p-6 mb-6 space-y-4">
-        <h3 className="font-bold text-[var(--color-text)] uppercase tracking-widest text-xs">Wrap Up</h3>
-        <div className="flex gap-4 flex-wrap">
-          <div>
-            <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Session duration (min)</label>
-            <input
-              type="number"
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              placeholder="60"
-              className="w-24 bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
-          </div>
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-bold text-[var(--color-text-faint)] uppercase tracking-widest mb-1">Session notes (optional)</label>
-            <input
-              type="text"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="How did it feel? Any issues?"
-              className="w-full bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-1.5 text-sm text-[var(--color-text)] focus:outline-none focus:border-[var(--color-accent)]"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-between items-center">
-        <button
-          onClick={() => router.push("/sessions")}
-          className="text-sm text-[var(--color-text-faint)] hover:text-[var(--color-text)]"
-        >
-          ← Back to sessions
-        </button>
-        <button
-          onClick={finishSession}
-          disabled={saving}
-          className="btn-accent"
-        >
-          {saving ? "Finishing..." : "Finish & Advance Cycle →"}
-        </button>
-      </div>
-    </div>
+      {open?.kind === "skip" && target && <SkipSheet name={target.name} onSkip={(reason) => act({ t: "skip", ex: target.id, reason })} onClose={() => setOpen(null)} />}
+      {open?.kind === "swap" && target && <SwapSheet name={target.name} prefs={prefs} onSwap={(name) => act({ t: "swap", ex: target.id, name })} onClose={() => setOpen(null)} />}
+      {open?.kind === "add" && <AddExerciseSheet prefs={prefs} onAdd={addExercise} onClose={() => setOpen(null)} />}
+      {open?.kind === "tag" && target && (
+        <FeedbackSheet sessionId={id} exerciseId={queue.current?.mapId(target.id) ?? target.id} exerciseName={target.name}
+          onTagged={(tag) => act({ t: "tag", ex: target.id, tag })} onSwap={(name) => act({ t: "swap", ex: target.id, name })} onClose={() => setOpen(null)} />
+      )}
+      {stage === "checkout" && (
+        <CheckOutSheet busy={false} hasConditioning={meta.hasConditioning} lastBodyweight={meta.lastBw} onClose={() => setStage("live")} onSubmit={(d) => void finish(d)} />
+      )}
+    </main>
   );
 }

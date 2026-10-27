@@ -455,7 +455,7 @@ export default function ProgressPage() {
 
   if (loading) {
     return (
-      <main className="p-4 max-w-[390px] mx-auto space-y-4">
+      <main className="p-4 max-w-2xl mx-auto space-y-4">
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 h-32 animate-pulse" />
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 h-32 animate-pulse" />
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 h-32 animate-pulse" />
@@ -465,7 +465,7 @@ export default function ProgressPage() {
 
   if (error) {
     return (
-      <main className="p-4 max-w-[390px] mx-auto">
+      <main className="p-4 max-w-2xl mx-auto">
         <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4">
           <p className="text-sm text-[var(--color-text-muted)]">{error}</p>
         </div>
@@ -478,7 +478,7 @@ export default function ProgressPage() {
   }
 
   return (
-    <main className="p-4 max-w-[390px] mx-auto space-y-4 pb-8">
+    <main className="p-4 max-w-2xl mx-auto space-y-4 pb-8">
       <h1 className="text-lg font-semibold text-[var(--color-text)] mb-4">
         Progress
       </h1>
