@@ -6,3 +6,4 @@ prisma/dev.db-journal
 .env
 backups/
 prisma/test.db*
+prisma/eval.db*
