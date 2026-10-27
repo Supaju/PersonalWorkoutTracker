@@ -19,15 +19,6 @@ export interface CoachContext {
   readiness: ReadinessInput | null;
 }
 
-type SessionWithRelations = ReturnType<typeof buildSessionWithRelations>;
-
-function buildSessionWithRelations(session: any) {
-  return {
-    ...session,
-    exercises: session.exercises,
-  };
-}
-
 export function toLoggedSession(s: {
   id: string;
   date: string;
@@ -250,4 +241,11 @@ export async function buildContext(
     checkIn,
     readiness,
   };
+}
+
+/** One exercise's logged exposures across history (oldest → newest), matched by case-insensitive name. */
+export function exerciseHistory(history: ContextSession[], name: string) {
+  const n = name.toLowerCase();
+  return history.flatMap((s) =>
+    s.exercises.filter((e) => e.name.toLowerCase() === n).map((exercise) => ({ date: s.date, exercise })));
 }
