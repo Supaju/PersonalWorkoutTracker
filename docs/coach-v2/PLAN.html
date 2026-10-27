@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coach v2 Plan</title>
+<style>
+  :root { --bg:#fff; --fg:#1b1d21; --muted:#5d6470; --line:#e3e6ea; --accent:#2457c5; --warn:#a15c00; --code:#f4f5f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14161a; --fg:#e6e8eb; --muted:#9aa1ad; --line:#2a2e35; --accent:#7aa2ff; --warn:#f0a94a; --code:#1d2026; } }
+  body { background:var(--bg); color:var(--fg); font:15px/1.55 system-ui, sans-serif; margin:0; padding:24px 16px 64px; }
+  main { max-width:940px; margin:0 auto; }
+  h1 { font-size:26px; margin:0 0 4px; } h2 { font-size:20px; margin:36px 0 8px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+  h3 { font-size:16px; margin:22px 0 6px; } p.sub { color:var(--muted); margin-top:0; }
+  code, pre { background:var(--code); border-radius:4px; font:13px/1.45 ui-monospace, Consolas, monospace; }
+  code { padding:1px 4px; } pre { padding:10px 12px; overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; margin:8px 0; font-size:14px; display:block; overflow-x:auto; }
+  th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  th { background:var(--code); }
+  .q { border-left:3px solid var(--warn); padding:4px 12px; margin:10px 0; }
+  .q b { color:var(--warn); }
+  li { margin:3px 0; }
+</style>
+</head>
+<body>
+<main>
+<h1>Coach v2: plan</h1>
+<p class="sub">Branch <code>coach-v2</code>. Planner: Opus. Execution: Sonnet managers → Haiku workers. The October coaching conversation is the design authority.</p>
+
+<h2>0. Status</h2>
+<ul>
+  <li><b>Phase 0 (contracts) landed</b> on <code>coach-v2</code>: Prisma schema + migration (owner data migrated, no loss), <code>lib/coach/schemas.ts</code>, <code>lib/coach/philosophy.ts</code>, <code>lib/coach/rules.ts</code> (signatures + specified behavior), <code>lib/coach/program-review.ts</code>, <code>lib/coach/engine.ts</code>, <code>lib/client.ts</code>, section 7 fixture, vitest.</li>
+  <li>DB backup before migration: <code>backups/dev.db.pre-coach-v2</code> (gitignored).</li>
+  <li>Migration verified: 1 client (<code>owner</code>), 1 profile, 46 equipment, 6 sessions, 33 exercises, 91 sets, 11 nutrition entries, 10 nutrition chat rows, all under <code>clientId = "owner"</code>.</li>
+</ul>
+
+<h2>1. Gap analysis: confirmed, with corrections</h2>
+<p>The brief's table is accurate. Corrections and additions from reading the code:</p>
+<ul>
+  <li>Next.js is <b>16</b>, not 15. <code>@anthropic-ai/sdk</code> was <b>0.39</b>, which predates structured outputs and the server web-search tool; upgraded to 1.3. Added <code>zod</code> 4, <code>vitest</code> 4, <code>tsx</code>.</li>
+  <li>The DB holds 6 legacy Upper/Lower sessions (2026-05-18 → 06-02). The October history from the conversation is <b>not</b> in the DB; it gets seeded from the fixture. The legacy sessions make the 4-month layoff visible to the rules (10/06 → re-entry) for free.</li>
+  <li>The nutrition chat already runs a tool loop (USDA + Tavily web search). Research uses Anthropic's server-side <code>web_search_20260209</code> tool instead, so there's one search path with citations. Tavily stays for nutrition only.</li>
+  <li>The model was hard-coded in 3 routes; JSON was regex-extracted from text with no validation. Both replaced by <code>MODELS</code> config + <code>messages.parse</code> with zod schemas.</li>
+  <li>Profile weight is 380 lb; the brief says 370. See question Q5.</li>
+  <li><code>planningChat</code> is a JSON string per session; folded into <code>CoachMessage</code> (linked by <code>sessionId</code>).</li>
+</ul>
+
+<h2>2. Design decisions (deviations from the brief's data model)</h2>
+<table>
+<tr><th>Brief</th><th>Decision</th><th>Why</th></tr>
+<tr><td><code>ClientSchedule</code> table</td><td>Fields on <code>Client</code>: <code>trainingDays</code>, <code>defaultMinutes</code>, <code>hardCapMinutes</code>, <code>layoffDays</code>, <code>reviewEveryWeeks</code>, <code>webResearch</code>, <code>persona</code></td><td>Strictly 1:1. One less join everywhere.</td></tr>
+<tr><td><code>ProgramState</code> (phase, nextSessionType, lastHeavyDate)</td><td>Not stored. Phase = current <code>ProgramVersion</code>; next type and last heavy day are derived by <code>rules.selectSessionType</code> from sessions.</td><td>Stored derived state goes stale (that's the bug in today's <code>CycleState</code>: it advances blindly). Deriving makes "missed session isn't skipped" automatic.</td></tr>
+<tr><td><code>ReadinessCheckIn</code> + <code>SessionFeedback</code></td><td>One <code>CheckIn</code> table, <code>kind</code> = <code>pre | check_out | next_day</code></td><td>Same fields (soreness, pain, bodyweight, notes), same consumers.</td></tr>
+<tr><td>SetLog <code>warmup</code></td><td><code>setType</code> = <code>ramp | working | abandoned</code></td><td>Matches the coach's and UI's language ("ramp sets").</td></tr>
+<tr><td>Prescription fields on SessionExercise</td><td><code>prescription</code> JSON (<code>PlannedSet[]</code>) + <code>block</code>, <code>pairGroup</code>, <code>unit</code>, <code>restSec</code>, <code>cue</code>, skip/swap/added flags. Full plan snapshot in <code>WorkoutSession.plan</code>.</td><td>Ramp + working targets are a list; the snapshot powers planned-vs-actual without a second table.</td></tr>
+<tr><td>CoachMessage replaces NutritionChat</td><td>NutritionChat kept, now client-scoped</td><td>It's a per-day food log conversation with its own tool loop; merging adds routing with no user benefit.</td></tr>
+<tr><td>Delete <code>CycleState</code>, <code>templates.ts</code></td><td>Kept (not used by new code)</td><td>Ask-before-delete rule. Q6.</td></tr>
+<tr><td><code>ProgramProposal</code></td><td>Added <code>fingerprint</code> (<code>phase|primaryTrigger</code>) and <code>weekToWeek</code></td><td>Fingerprint makes "don't re-propose without new evidence" a deterministic check.</td></tr>
+</table>
+
+<h2>3. Shared contracts (landed; read these, don't duplicate)</h2>
+<table>
+<tr><th>File</th><th>Contains</th></tr>
+<tr><td><code>prisma/schema.prisma</code></td><td>All models. Every client-owned row has <code>clientId</code>.</td></tr>
+<tr><td><code>lib/client.ts</code></td><td><code>getClientId()</code>: the only way routes resolve the client (cookie <code>clientId</code>, fallback first active client).</td></tr>
+<tr><td><code>lib/coach/schemas.ts</code></td><td>Zod: enums, <code>CheckInInput</code>, <code>SessionPlan</code>, <code>SessionReview</code>, <code>ProgramStructure</code>, <code>ProposalOut</code>, <code>ResearchOut</code>, <code>CoachAction</code>.</td></tr>
+<tr><td><code>lib/coach/philosophy.ts</code></td><td><code>MODELS</code>, numeric rules (<code>PROGRESSION</code>, <code>SESSION</code>, <code>READINESS</code>, <code>PROGRAM_REVIEW</code>), prose <code>PHILOSOPHY</code>, <code>DEFAULT_PERSONA</code>.</td></tr>
+<tr><td><code>lib/coach/rules.ts</code></td><td>Pure rule signatures with exact behavior in doc comments: <code>detectLayoff</code>, <code>selectSessionType</code>, <code>emphasisShifts</code>, <code>musclesTrainedRecently</code>, <code>nextWorkingWeight</code>, <code>estimateWeightForReps</code>, <code>roundLoad</code>, <code>estimateDuration</code>, <code>applyPreferences</code>, <code>carryOverSkips</code>, <code>weekView</code>.</td></tr>
+<tr><td><code>lib/coach/program-review.ts</code></td><td><code>computeTrends</code>, <code>detectTriggers</code>, <code>targetPhase</code>, <code>proposalFingerprint</code>, <code>isSuppressed</code>, <code>runProgramReview</code>, <code>decideProposal</code>.</td></tr>
+<tr><td><code>lib/coach/engine.ts</code></td><td>Public engine API for routes: <code>planSession</code>, <code>refinePlan</code>, <code>reviewSession</code>, <code>answerQuestion</code>, <code>research</code>.</td></tr>
+<tr><td><code>lib/coach/__fixtures__/owner-oct-2026.ts</code></td><td>Section 7 history as <code>LoggedSession[]</code>, owner profile/considerations/preferences, <code>EXPECTED</code> outcomes.</td></tr>
+</table>
+
+<h3>Key rule decisions (so nobody makes coaching judgment calls)</h3>
+<ul>
+  <li><b>Increase:</b> all working sets hit target, min RIR ≥ 2 or unrecorded → <code>round5(w × 1.05)</code>, at least +5, at most +20%. 380→400, 120→125, 160→170, 50→55 per hand.</li>
+  <li><b>Reduce:</b> target hit but any working set RIR ≤ 1 → <code>round5(w × 0.95)</code>. Bench 185 (RIR 0) → 175.</li>
+  <li><b>Jump too big:</b> miss after a &gt;50% jump within a session → Brzycki estimate for target+2 reps. Chest press 180×6, target 10 → 145.</li>
+  <li><b>Skipped last time:</b> reinstate one step up; kettlebells use a ladder (45 → 53).</li>
+  <li><b>Session type:</b> layoff (&gt;10 days) → re-entry; else heavy unless the last heavy/re-entry session was &lt;48 h ago → light. Poor sleep or ≥2 significantly sore areas swaps heavy → light. Rotation phases (Upper/Lower) take the next type after the last one done, so missed days never advance them.</li>
+  <li><b>Duration:</b> computed by <code>estimateDuration</code> and overwrites the model's estimate.</li>
+  <li><b>RIR "1–2"</b> is stored as 1.</li>
+</ul>
+
+<h3>Model usage</h3>
+<ul>
+  <li><code>MODELS.routine = claude-sonnet-5-5</code> (plan, refine, review, conversation). <code>MODELS.deep = claude-opus-5-5</code> (program review, research). Env-overridable.</li>
+  <li>Structured output via <code>client.messages.parse</code> + <code>zodOutputFormat</code>; validate, retry once on failure.</li>
+  <li>Research: server tool <code>{ type: "web_search_20260209", name: "web_search", max_uses: 5 }</code>; collect sources from <code>web_search_tool_result</code> blocks and text citations. A search error comes back as a result block, not an exception. When <code>Client.webResearch</code> is false, no tool; the note says no research was run.</li>
+  <li>Conversation: tool use with <code>tool_choice: auto</code> (forced tool choice is a 400 on these models). Tools: <code>plan_today</code>, <code>refine_plan</code>, <code>save_preference</code>, <code>save_consideration</code>, <code>update_schedule</code>, <code>save_checkin</code>, <code>review_session</code>, <code>start_program_review</code>, <code>research</code>.</li>
+</ul>
+
+<h2>4. API routes (Workstream D owns, all scoped via <code>getClientId()</code>)</h2>
+<table>
+<tr><th>Route</th><th>Body → Response</th></tr>
+<tr><td><code>GET/POST /api/clients</code>, <code>PATCH /api/clients/[id]</code></td><td>list / create (name, profile, schedule) / update settings, persona, active</td></tr>
+<tr><td><code>POST /api/clients/select</code></td><td><code>{clientId}</code> → sets cookie</td></tr>
+<tr><td><code>GET/POST/DELETE /api/preferences</code>, <code>/api/considerations</code></td><td>CRUD for current client</td></tr>
+<tr><td><code>GET /api/today</code></td><td>→ <code>{date, isTrainingDay, suggestedSessionType, reasons, activeSession, plannedSession, lastSession:{id,date,sessionType,summary}, pendingQuestions, pendingProposals, needsNextDayCheck:{areas}}</code></td></tr>
+<tr><td><code>GET /api/week?date=</code></td><td>→ <code>rules.weekView</code> output</td></tr>
+<tr><td><code>GET/POST /api/coach/messages</code></td><td>POST <code>{text, sessionId?}</code> → <code>{messages: CoachMessage[]}</code> (user + assistant, with <code>action</code>)</td></tr>
+<tr><td><code>POST /api/checkins</code></td><td><code>CheckInInput</code> → <code>{id}</code></td></tr>
+<tr><td><code>POST /api/sessions/plan</code></td><td><code>{date, checkInId?, sessionTypeOverride?}</code> → <code>{sessionId, plan}</code></td></tr>
+<tr><td><code>POST /api/sessions/[id]/refine</code></td><td><code>{message}</code> → <code>{plan, reply}</code></td></tr>
+<tr><td><code>GET/PATCH/DELETE /api/sessions/[id]</code></td><td>full session (exercises, sets, cardio, feedback, questions, checkIns, plan); PATCH <code>{phase?, startedAt?, finishedAt?, notes?}</code></td></tr>
+<tr><td><code>POST /api/sessions</code></td><td>manual/after-the-fact session with full set grid</td></tr>
+<tr><td><code>PUT /api/sessions/[id]/sets/[setId]</code></td><td>Idempotent upsert, client-generated id: <code>{exerciseId, setNumber, setType, weightLbs, reps, rir, durationSec, distanceYd, notes}</code>. <code>DELETE</code> removes.</td></tr>
+<tr><td><code>POST /api/sessions/[id]/exercises</code>, <code>PATCH .../exercises/[exId]</code></td><td>add unplanned / skip <code>{skipped, skipReason}</code>, swap <code>{name, swappedFrom}</code>, reorder <code>{orderIndex}</code></td></tr>
+<tr><td><code>PUT .../exercises/[exId]/cardio</code>, <code>POST .../exercises/[exId]/feedback</code></td><td>CardioLog upsert; ExerciseFeedback <code>{tags, painLocation?, painSharp?, note?}</code> → <code>{coachReply?}</code> when pain</td></tr>
+<tr><td><code>POST /api/sessions/[id]/review</code></td><td>→ <code>SessionReview</code> (re-review when edited after review)</td></tr>
+<tr><td><code>POST /api/questions/[id]/answer</code></td><td><code>{answer}</code> → <code>{progression}</code></td></tr>
+<tr><td><code>GET /api/program</code>, <code>POST /api/program/review</code></td><td>current version, history, proposals / trigger review</td></tr>
+<tr><td><code>POST /api/proposals/[id]</code></td><td><code>{decision: accept|reject, response?}</code></td></tr>
+<tr><td><code>GET/POST /api/research</code></td><td>list notes / <code>{question}</code></td></tr>
+<tr><td><code>GET /api/progress</code></td><td>per-exercise working weight + e1RM (reps+RIR), bodyweight, adherence, cardio minutes, version markers</td></tr>
+</table>
+
+<h2>5. Workstreams and ownership</h2>
+<p>Each manager works in its own git worktree branched from <code>coach-v2</code> and owns only the files listed. Contract files are read-only for managers; a needed change gets reported to the planner.</p>
+<table>
+<tr><th>Wave</th><th>WS</th><th>Owns</th><th>Done when</th></tr>
+<tr><td>1</td><td><b>A. Data &amp; migration</b></td><td><code>scripts/seed-owner.ts</code> (idempotent: owner ProgramVersion v1 from <code>CycleState</code> + heavy/light structure, considerations, preferences, Oct fixture sessions, planningChat → CoachMessage); <code>scripts/seed-test-client.ts</code>; existing routes <code>app/api/{equipment,profile,nutrition/**,meals/**,ai/review}</code> + <code>lib/ai.ts</code> (nutrition/meal prompts) scoped by client</td><td>typecheck clean for owned files; seed run twice → same counts; second client isolated (script asserts)</td></tr>
+<tr><td>1</td><td><b>B. Coach engine</b></td><td><code>lib/coach/rules.ts</code> + <code>rules.test.ts</code>, <code>context.ts</code>, <code>prompts.ts</code>, <code>llm.ts</code>, <code>plan.ts</code>, <code>review.ts</code>, <code>engine.ts</code> (plan/refine/review/answer)</td><td>criteria 3–7 and 14 (bench answer → 175) pass as unit tests; plan validated + persisted against a test DB</td></tr>
+<tr><td>1</td><td><b>C. Program evolution &amp; research</b></td><td><code>lib/coach/program-review.ts</code> + test, <code>research.ts</code>, <code>engine.research</code>, <code>__fixtures__/extensions.ts</code> (5 consistent weeks; 3-week layoff)</td><td>criteria 10–11 trigger/suppression unit tests pass; research returns ≥2 sources live</td></tr>
+<tr><td>1</td><td><b>D. Conversation &amp; API</b></td><td><code>lib/coach/conversation.ts</code>, all new routes in §4, replacing <code>app/api/sessions/**</code> and <code>app/api/cycle/**</code></td><td>every route compiles, filters by <code>getClientId()</code>; conversation persists messages and saves stated preferences</td></tr>
+<tr><td>2</td><td><b>E1. Coach UI</b></td><td><code>app/page.tsx</code> (coach home), <code>app/layout.tsx</code>, <code>components/sidebar.tsx</code> + client switcher, <code>app/program/**</code>, <code>app/settings/**</code>, <code>app/research/**</code>, meals/nutrition pages re-pointed</td><td>full loop runnable by talking; proposals accept/reject; switcher isolates data</td></tr>
+<tr><td>2</td><td><b>E2. Gym UI</b></td><td><code>app/sessions/**</code>: today view, live record mode (steppers, RIR buttons, rest timer, localStorage queue + retry), check-in/out, next-day check, tags, clarifying replies, history planned-vs-actual, week view, progress, print sheet</td><td>criterion 13 at 390px width; reload mid-session loses nothing</td></tr>
+<tr><td>3</td><td><b>F. Verification</b></td><td><code>scripts/eval-coach.ts</code>, isolation test, README</td><td>all unit tests + eval (criteria 1–15) pass; nutrition works per client</td></tr>
+<tr><td>later</td><td>G. Photo import</td><td>planned only</td><td>n/a</td></tr>
+</table>
+
+<h3>Rules for managers</h3>
+<ul>
+  <li>Split work into Haiku-sized tasks: one file or function, exact inputs/outputs/types, file path, and a check that proves it's done. Paste the relevant contract snippets into each task.</li>
+  <li>No coaching judgment calls in worker tasks. Philosophy comes from <code>philosophy.ts</code> or the task spec.</li>
+  <li>After each worker task: <code>npm run typecheck</code> (scoped to owned files while other workstreams are in flight), <code>npm test</code>. Send failures back with the output.</li>
+  <li>Small commits per task. Never commit <code>.env</code> or <code>prisma/dev.db</code>. Never delete existing data or templates.</li>
+  <li>Tests needing a DB use <code>DATABASE_URL=file:./test.db</code> + <code>prisma migrate reset --force --skip-seed</code> on the test file only. Never touch <code>dev.db</code> from tests.</li>
+  <li>Report: what changed, what's tested, any contract deviations.</li>
+</ul>
+
+<h2>6. Open questions for the owner</h2>
+<p>Defaults below are applied unless you say otherwise.</p>
+<div class="q"><b>Q1 (3.8).</b> "6 exercises, 20 sets" is replaced by time-budgeted blocks (warm-up → strength → conditioning → cool-down, 60 min default, 90 cap).</div>
+<div class="q"><b>Q2 (3.8).</b> "No arm isolation as primary" changes to: arm isolation is allowed on light/accessory days and stays off heavy days.</div>
+<div class="q"><b>Q3 (3.8).</b> "Conditioning finisher is mandatory" changes to: conditioning every session, but it can be skipped for time if it's made up next session.</div>
+<div class="q"><b>Q4 (3.8).</b> "Trap bar priority" becomes a progression option. The default hinge is dumbbell RDL.</div>
+<div class="q"><b>Q5.</b> Profile says 380 lb, the brief says 370. Default: the seed logs 370 as a bodyweight check-in on 10/26 and updates the profile.</div>
+<div class="q"><b>Q6.</b> After v2 is verified, drop the <code>CycleState</code> table and <code>lib/templates.ts</code> (their content lives on in ProgramVersion v1 and the Upper/Lower structure)? Default: keep until you say yes.</div>
+<div class="q"><b>Q7.</b> The legacy gym-bro persona is replaced for the owner by the calm/direct one. The old persona text is kept in git history only.</div>
+<div class="q"><b>Q8.</b> Models: Sonnet 5.5 for routine calls, Opus 5.5 for program reviews and research. Research is on by default (<code>Client.webResearch</code>).</div>
+</main>
+</body>
+</html>

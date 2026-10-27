@@ -7,23 +7,307 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ─── Client ──────────────────────────────────────────────────────────────────
+// Every client-owned row carries clientId. Always resolve it via lib/client.ts.
+// Schedule + coach settings live on Client (1:1, no separate ClientSchedule table).
+
+model Client {
+  id               String   @id @default(cuid())
+  name             String
+  active           Boolean  @default(true)
+  persona          String // coach voice, injected into every prompt
+  trainingDays     String   @default("[1,2,4,5]") // JSON number[]; 0=Sun … 6=Sat
+  defaultMinutes   Int      @default(60)
+  hardCapMinutes   Int      @default(90)
+  layoffDays       Int      @default(10) // gap (days) that triggers a re-entry session
+  reviewEveryWeeks Int      @default(4)
+  webResearch      Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  profile        UserProfile?
+  equipment      Equipment[]
+  sessions       WorkoutSession[]
+  considerations ClientConsideration[]
+  preferences    ExercisePreference[]
+  checkIns       CheckIn[]
+  programs       ProgramVersion[]
+  proposals      ProgramProposal[]
+  research       ResearchNote[]
+  messages       CoachMessage[]
+  mealPlans      MealPlan[]
+  nutrition      NutritionEntry[]
+  nutritionChat  NutritionChat[]
+  reviews        AIReview[]
+}
+
 model UserProfile {
   id        String   @id @default(cuid())
+  clientId  String   @unique
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name      String?
   age       Int
   gender    String
   heightIn  Float
   weightLbs Float
-  goals     String
+  goals     String // Goal key (lib/types.ts)
+  goalNotes String? // free text: "prepare for fatherhood and aging"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+model ClientConsideration {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category  String // body_size | injury | medical | equipment | other
+  text      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
+}
+
+model ExercisePreference {
+  id            String   @id @default(cuid())
+  clientId      String
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  exerciseName  String
+  kind          String // disliked | preferred | substitute
+  substituteFor String? // kind=substitute: use exerciseName instead of substituteFor
+  note          String?
+  createdAt     DateTime @default(now())
+
+  @@unique([clientId, exerciseName, kind])
+}
+
 model Equipment {
   id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   name     String
   category String
+
+  @@index([clientId])
 }
+
+// ─── Program ─────────────────────────────────────────────────────────────────
+// ProgramVersion replaces CycleState + lib/templates.ts as source of truth.
+// "Next session type", "last heavy day" are derived from sessions (lib/coach/rules.ts), not stored.
+
+model ProgramVersion {
+  id         String    @id @default(cuid())
+  clientId   String
+  client     Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  version    Int
+  phase      String // heavy_light_fullbody | upper_lower_4day | <coach-defined>
+  structure  String // JSON ProgramStructure (lib/coach/schemas.ts)
+  reason     String
+  startDate  String // YYYY-MM-DD
+  endDate    String? // null = current
+  proposalId String?   @unique
+  proposal   ProgramProposal? @relation(fields: [proposalId], references: [id])
+  createdAt  DateTime  @default(now())
+
+  sessions WorkoutSession[]
+
+  @@unique([clientId, version])
+}
+
+model ProgramProposal {
+  id              String    @id @default(cuid())
+  clientId        String
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  trigger         String // JSON TriggerKind[]
+  fingerprint     String // `${proposedPhase}|${primaryTrigger}`, used to suppress re-proposals
+  observations    String // JSON string[] with numbers from logs
+  recommendation  String
+  rationale       String
+  tradeOffs       String
+  weekToWeek      String // what changes week to week
+  structure       String // JSON ProgramStructure
+  researchNoteIds String    @default("[]")
+  status          String    @default("pending") // pending | accepted | rejected | superseded
+  clientResponse  String?
+  createdAt       DateTime  @default(now())
+  decidedAt       DateTime?
+
+  version ProgramVersion?
+
+  @@index([clientId, status])
+}
+
+model ResearchNote {
+  id                  String   @id @default(cuid())
+  clientId            String
+  client              Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  question            String
+  summary             String
+  applicationToClient String
+  confidence          String // low | moderate | high
+  sources             String // JSON {title,url}[]
+  proposalId          String?
+  sessionId           String?
+  createdAt           DateTime @default(now())
+
+  @@index([clientId])
+}
+
+// One persistent coach thread per client. Replaces WorkoutSession.planningChat.
+model CoachMessage {
+  id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  role       String // user | assistant
+  content    String
+  action     String? // JSON CoachAction (what the coach did, for UI cards)
+  sessionId  String?
+  proposalId String?
+  createdAt  DateTime @default(now())
+
+  @@index([clientId, createdAt])
+}
+
+// ─── Sessions ────────────────────────────────────────────────────────────────
+
+model WorkoutSession {
+  id               String          @id @default(cuid())
+  clientId         String
+  client           Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  programVersionId String?
+  programVersion   ProgramVersion? @relation(fields: [programVersionId], references: [id])
+  date             String // YYYY-MM-DD
+  template         String // legacy template id; kept for migrated rows
+  sessionType      String          @default("legacy") // SessionType
+  phase            String          @default("planned") // planned | active | recorded
+  name             String? // "Rebuild 4"
+  estimatedMinutes Int?
+  durationMin      Int?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  notes            String?
+  coachNotes       String? // why today looks like this (1–2 sentences)
+  plan             String? // JSON SessionPlan snapshot as first generated (planned vs actual)
+  coachReview      String? // JSON SessionReview
+  reviewedAt       DateTime?
+  planningChat     String? // legacy; migrated into CoachMessage, do not write
+  createdAt        DateTime        @default(now())
+
+  exercises SessionExercise[]
+  checkIns  CheckIn[]
+  questions ClarifyingQuestion[]
+
+  @@index([clientId, date])
+}
+
+model SessionExercise {
+  id           String         @id @default(cuid())
+  sessionId    String
+  session      WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  slot         String         @default("") // legacy
+  name         String
+  muscleGroups String // comma separated
+  block        String         @default("strength") // warmup | strength | conditioning | cooldown
+  pairGroup    String? // "A" → A1/A2
+  unit         String         @default("total") // total | per_hand | bodyweight | time | distance | cardio
+  restSec      Int?
+  cue          String?
+  prescription String? // JSON PlannedSet[] (ramp + working targets)
+  targetSets   Int            @default(0) // legacy
+  targetReps   String         @default("") // legacy
+  targetWeight Float? // legacy
+  orderIndex   Int
+  aiNotes      String? // why the target changed
+  added        Boolean        @default(false) // unplanned, added by client
+  swappedFrom  String?
+  skipped      Boolean        @default(false)
+  skipReason   String? // time | fatigue | pain | equipment | disliked | other
+
+  sets     SetLog[]
+  cardio   CardioLog[]
+  feedback ExerciseFeedback[]
+}
+
+model SetLog {
+  id          String          @id @default(cuid()) // client may supply id (idempotent offline retry)
+  exerciseId  String
+  exercise    SessionExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  setNumber   Int
+  setType     String          @default("working") // ramp | working | abandoned
+  weightLbs   Float? // per-hand when exercise.unit = per_hand
+  reps        Int?
+  rir         Int? // 0,1,2,3,4 (4 = 4+)
+  durationSec Int?
+  distanceYd  Float?
+  notes       String?
+  loggedAt    DateTime        @default(now())
+}
+
+model CardioLog {
+  id             String          @id @default(cuid())
+  exerciseId     String
+  exercise       SessionExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  machine        String // recumbent_bike | treadmill | elliptical | rower | sled | other
+  minutes        Float
+  settings       String? // JSON {speed?, incline?, level?}
+  intervals      String? // "6 x 1 min hard / 1 min easy"
+  perceivedEffort Int? // 1–10
+  talkTest       String? // full_sentences | short_phrases | few_words
+  heartRate      Int?
+  distanceMi     Float?
+  calories       Int?
+  notes          String?
+  loggedAt       DateTime        @default(now())
+}
+
+model ExerciseFeedback {
+  id            String          @id @default(cuid())
+  exerciseId    String
+  exercise      SessionExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  tags          String // JSON FeedbackTag[]
+  painLocation  String?
+  painSharp     Boolean?
+  note          String?
+  createdAt     DateTime        @default(now())
+}
+
+// Pre-session check-in, post-session check-out, and next-day soreness check in one table.
+model CheckIn {
+  id               String          @id @default(cuid())
+  clientId         String
+  client           Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sessionId        String?
+  session          WorkoutSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  kind             String // pre | check_out | next_day
+  date             String // YYYY-MM-DD
+  soreness         String? // JSON Partial<Record<BodyArea, Soreness>>
+  sleep            String? // poor | ok | good
+  energy           String? // low | normal | high
+  minutesAvailable Int?
+  painNotes        String?
+  effort           Int? // check_out: 1–10
+  enjoyment        Int? // check_out: 1–5
+  conditioning     String? // too_easy | about_right | too_hard
+  bodyweightLbs    Float?
+  note             String?
+  createdAt        DateTime        @default(now())
+
+  @@index([clientId, date])
+}
+
+model ClarifyingQuestion {
+  id           String         @id @default(cuid())
+  sessionId    String
+  session      WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseName String?
+  kind         String // rir | abandoned | skip | unexpected | other
+  question     String
+  options      String // JSON string[] quick replies
+  answer       String?
+  answeredAt   DateTime?
+  createdAt    DateTime       @default(now())
+}
+
+// ─── Nutrition (unchanged behavior, now client-scoped) ───────────────────────
 
 model FoodItem {
   id       String  @id @default(cuid())
@@ -36,63 +320,28 @@ model FoodItem {
 }
 
 model MealPlan {
-  id    String @id @default(cuid())
-  date  String @unique
-  meals String
+  id       String @id @default(cuid())
+  clientId String
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  date     String
+  meals    String
+
+  @@unique([clientId, date])
 }
 
 model AIReview {
   id         String   @id @default(cuid())
+  clientId   String
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   createdAt  DateTime @default(now())
   reviewText String
   category   String
 }
 
-model CycleState {
-  id              String   @id @default("singleton")
-  currentTemplate String   @default("upper_b")
-  sessionCount    Int      @default(0)
-  updatedAt       DateTime @updatedAt
-}
-
-model WorkoutSession {
-  id          String            @id @default(cuid())
-  date        String
-  template    String
-  phase       String            @default("planned")
-  durationMin Int?
-  notes       String?
-  planningChat String?
-  exercises   SessionExercise[]
-  createdAt   DateTime          @default(now())
-}
-
-model SessionExercise {
-  id           String         @id @default(cuid())
-  sessionId    String
-  session      WorkoutSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  slot         String
-  name         String
-  muscleGroups String
-  targetSets   Int
-  targetReps   String
-  targetWeight Float?
-  orderIndex   Int
-  aiNotes      String?
-  sets         SetLog[]
-}
-
-model SetLog {
-  id         String          @id @default(cuid())
-  exerciseId String
-  exercise   SessionExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
-  setNumber  Int
-  weightLbs  Float
-  reps       Int
-}
-
 model NutritionEntry {
   id          String   @id @default(cuid())
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   date        String
   slot        String
   description String
@@ -103,15 +352,26 @@ model NutritionEntry {
   source      String
   createdAt   DateTime @default(now())
 
-  @@index([date])
+  @@index([clientId, date])
 }
 
+// Kept separate from CoachMessage: it is a per-day food log conversation, not coaching.
 model NutritionChat {
   id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
   date      String
   role      String
   content   String
   createdAt DateTime @default(now())
 
-  @@index([date])
+  @@index([clientId, date])
+}
+
+// Legacy singleton. Migrated into ProgramVersion v1; kept until owner approves dropping it.
+model CycleState {
+  id              String   @id @default("singleton")
+  currentTemplate String   @default("upper_b")
+  sessionCount    Int      @default(0)
+  updatedAt       DateTime @updatedAt
 }
