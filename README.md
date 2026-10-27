@@ -1,80 +1,66 @@
 # Personal Workout Tracker
 
-A personal fitness app built with Next.js and Claude AI. Plans workouts based on training history, tracks sessions and sets, and lets you have a conversation with Claude to refine the plan before you hit the gym.
+An AI personal trainer built with Next.js and Claude. You talk to the coach. It plans each session from your history, schedule, recovery and how you feel today. You log the session set by set on your phone, and the coach reviews it, asks about anything ambiguous, and sets the next targets. Over weeks it reviews the program itself and proposes changes, backed by research.
+
+## The core loop
+
+1. **Check in.** How you feel, what's sore, how much time you have.
+2. **Plan.** The coach writes today's session (warm-up → strength with supersets → conditioning → cool-down) to fit your time, and explains why it looks that way.
+3. **Adjust.** Push back or ask ("I'd rather bench"). The coach changes the plan and remembers preferences.
+4. **Log.** Live mode on your phone: steppers, RIR buttons, rest timer, skip reasons, cardio, abandoned attempts. Works offline.
+5. **Review.** The coach reads the log, asks targeted questions (for example "How many reps did you have left?"), and sets next targets.
+6. **Evolve.** Program reviews (every 4 weeks, or when triggered) produce proposals you accept or reject. Accepting one creates a new program version.
 
 ## Features
 
-- **AI workout planning** — Claude designs each session based on your profile, equipment, and prior session history using progressive overload
-- **4-day Upper/Lower split** — Upper A, Lower A, Upper B, Lower B cycling automatically
-- **Conversational plan revision** — after generating a workout, give Claude feedback in a chat drawer and see a diff of proposed changes before accepting
-- **Session recording** — log sets, reps, and weight for each exercise during your workout
-- **Progress tracking** — charts for volume, weight, and reps over time per exercise
-- **Meal planning** — AI-generated daily meal plans from your food library with macro targets
-- **Equipment management** — catalog your gym's equipment so Claude picks appropriate exercises
-- **Nutrition deviation analysis** — describe what you ate and get a macro estimate and course correction
+- **Coach conversation** (home page): persistent per client. It can plan, refine, save preferences and considerations, update your schedule, review sessions, answer questions, start program reviews and run research.
+- **Today's workout and live recording** (`/sessions/today`): blocks, A1/A2 pairs, ramp vs working sets, targets with RIR, cues, and per-exercise history. Sets save as you go, with an offline queue and retry.
+- **History** shows planned vs actual. **Progress** charts working weight, estimated strength (reps + RIR), bodyweight, adherence, cardio and program-version markers. Each session has a **printable** paper log sheet.
+- **Program** (`/program`): current version, this week, version history, proposals, and research notes with sources.
+- **Settings** (`/settings`): profile, schedule, coach persona, considerations, exercise preferences, equipment, and adding a client.
+- **Meals and nutrition**: AI meal plans and a conversational food log, scoped per client.
+- **Multiple clients**: switch clients in the header. All data is isolated per client. There is no authentication yet.
 
-## Tech Stack
+## Tech stack
 
-- [Next.js 15](https://nextjs.org/) App Router
-- [Prisma](https://www.prisma.io/) + SQLite
-- [Anthropic Claude API](https://www.anthropic.com/) (`claude-sonnet-4-6`)
-- [Tailwind CSS v4](https://tailwindcss.com/)
-- [Recharts](https://recharts.org/)
+Next.js 16 (App Router) · Prisma + SQLite · Anthropic SDK (Claude Sonnet 5.5 for routine coaching, Claude Opus 5.5 for program reviews and research, with server-side web search) · Tailwind CSS v4 · Recharts · zod · vitest
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+
-- An Anthropic API key
-
-### Setup
+## Getting started
 
 ```bash
-# Install dependencies
 npm install
-
-# Set up environment variables
-cp .env.example .env.local
-# Add your ANTHROPIC_API_KEY to .env.local
-
-# Run database migrations
+cp .env.example .env.local      # add ANTHROPIC_API_KEY (and USDA/Tavily keys for nutrition)
 npx prisma migrate deploy
-
-# Start the dev server
+npm run seed:owner              # optional: the owner's October 2026 history + program v1 (idempotent)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open http://localhost:3000.
 
-### First-time configuration
+| Command | What it does |
+|---|---|
+| `npm test` | Unit and DB tests (vitest, on `prisma/test.db`; never touches `dev.db`) |
+| `npm run eval` | Model-in-the-loop acceptance eval against the section 7 fixture (`prisma/eval.db`, makes live API calls) |
+| `npm run typecheck` | `tsc --noEmit` |
 
-1. **Profile** — set your age, weight, height, and gender so Claude can calculate targets
-2. **Equipment** — add the machines and free weights available at your gym
-3. **Food library** — add foods you regularly eat for meal planning
+## Where the coaching philosophy lives
 
-## Project Structure
+| What | Where |
+|---|---|
+| Rules as numbers (progression %, RIR targets, rounding, readiness swaps, program-review thresholds) and the model choice | `lib/coach/philosophy.ts` |
+| Rules as prose injected into prompts (session design, weekly structure, safety, voice, research) | `PHILOSOPHY` in `lib/coach/philosophy.ts` |
+| Deterministic decisions (session type, layoff, next working weight, duration, week view) | `lib/coach/rules.ts` (unit-tested) |
+| Program triggers, proposals, versioning | `lib/coach/program-review.ts` |
+| Program structures (heavy/light full body, Upper/Lower 4-day) | `lib/coach/structures.ts` |
+| Per-client settings: schedule, session minutes, layoff threshold, review cadence, web research on/off, persona | the `Client` row, edited in Settings |
+| Per-client considerations (body size, injuries) and exercise preferences | Settings, or tell the coach |
 
-```
-app/                  # Next.js App Router pages and API routes
-  api/                # API routes (sessions, equipment, meals, AI endpoints)
-  sessions/           # Plan, record, and review session pages
-  progress/           # Progress charts
-  meals/              # Meal planning
-  equipment/          # Equipment management
-  profile/            # User profile
-components/           # Shared React components
-lib/
-  ai.ts               # Claude prompt builders
-  ai-config.ts        # Central config for all AI goals and guidelines
-  templates.ts        # Workout template structure (slots, examples, set counts)
-  types.ts            # Shared TypeScript types
-prisma/
-  schema.prisma       # Database schema
-```
+Anything that can be computed is computed in code and passed to the model as a fact. The model writes the plan around those facts, and the code checks its output (weights, disliked exercises, time budget) before saving it.
 
-## AI Configuration
+## Adding a client
 
-All training philosophy, nutrition targets, and AI behavior lives in `lib/ai-config.ts`. Edit this file to change goals, rep ranges, progression rules, or nutrition targets without touching prompt strings.
+Go to Settings → **New client** (or `POST /api/clients`), then pick the client in the header switcher. Set their schedule, considerations and persona in Settings, and talk to the coach to plan their first session. The first session is a re-entry session, since there's no history yet. Every query is scoped through `getClientId()` in `lib/client.ts`, the one place that decides the current client.
 
-Workout program structure (the A/B split, slot definitions, and exercise options) lives in `lib/templates.ts`.
+## Design docs
+
+`docs/coach-v2/PLAN.html`: architecture, data model, API contract, workstreams, and open questions.

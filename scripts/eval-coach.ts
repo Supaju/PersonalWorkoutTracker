@@ -1,6 +1,8 @@
 // Model-in-the-loop acceptance eval. Run: npm run eval  (needs ANTHROPIC_API_KEY, e.g. from .env.local).
 // Uses prisma/eval.db only (never dev.db). Every case prints PASS/FAIL with evidence; exit 1 on any FAIL.
 process.env.DATABASE_URL = "file:./eval.db";
+import { execSync } from "node:child_process";
+execSync("npx prisma migrate deploy", { stdio: "ignore", env: process.env });
 
 import type { LoggedSession } from "../lib/coach/rules";
 import type { SessionPlan, SessionReview, SessionType } from "../lib/coach/schemas";

@@ -27,6 +27,19 @@
 <p class="sub">Branch <code>coach-v2</code>. Planner: Opus. Execution: Sonnet managers → Haiku workers. The October coaching conversation is the design authority.</p>
 
 <h2>0. Status</h2>
+<p><b>Waves 1–3 merged into <code>coach-v2</code>.</b> 119 unit/DB tests pass, typecheck is clean, and <code>next build</code> succeeds.</p>
+<table>
+<tr><th>Criterion</th><th>How verified</th><th>Result</th></tr>
+<tr><td>1, 2, 4, 5, 9, 14a–c</td><td>Live eval (<code>npm run eval</code>)</td><td>Pass</td></tr>
+<tr><td>3, 6, 7, 15 (week view)</td><td>Deterministic tests (<code>rules.test.ts</code>, <code>acceptance.test.ts</code>) + live eval C3</td><td>Pass</td></tr>
+<tr><td>6 (live)</td><td>Eval C6 failed on unit (farmer carry returned as <code>distance</code>). Fixed: units are pinned to history; unit test added.</td><td>Fixed; live re-run blocked (API credits ran out)</td></tr>
+<tr><td>8</td><td>Live eval C8 on every plan + budget-trim unit tests</td><td>Pass</td></tr>
+<tr><td>10, 11</td><td>Trigger/suppression unit tests + live eval</td><td>Pass</td></tr>
+<tr><td>12</td><td>Live: ≥2 credible sources (JOSPT, PubMed, Wiley), seeDoctor, swap today; web-off says no research was run. Initially failed (JSON truncated at 2048 tokens); fixed.</td><td>Pass</td></tr>
+<tr><td>13</td><td>Scripted through the API exactly as the UI does (22 sets, 2 abandoned, RIR on all working sets, skip "time", idempotent re-sends). Reducer + offline queue unit tests.</td><td>Pass via API; <b>not yet tried in a real phone browser</b></td></tr>
+<tr><td>15 (display)</td><td>Pages render (200) and the build passes</td><td><b>Not visually checked</b> (no browser tool in this session)</td></tr>
+</table>
+<h3>Phase 0 notes</h3>
 <ul>
   <li><b>Phase 0 (contracts) landed</b> on <code>coach-v2</code>: Prisma schema + migration (owner data migrated, no loss), <code>lib/coach/schemas.ts</code>, <code>lib/coach/philosophy.ts</code>, <code>lib/coach/rules.ts</code> (signatures + specified behavior), <code>lib/coach/program-review.ts</code>, <code>lib/coach/engine.ts</code>, <code>lib/client.ts</code>, section 7 fixture, vitest.</li>
   <li>DB backup before migration: <code>backups/dev.db.pre-coach-v2</code> (gitignored).</li>
