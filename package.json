@@ -9,7 +9,7 @@
     "lint": "next lint",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "eval": "tsx scripts/eval-coach.ts",
+    "eval": "node --env-file-if-exists=.env.local --import tsx scripts/eval-coach.ts",
     "seed:owner": "tsx scripts/seed-owner.ts"
   },
   "dependencies": {
