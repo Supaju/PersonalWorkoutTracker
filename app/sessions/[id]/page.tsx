@@ -1,81 +1,129 @@
-import Link from "next/link";
-import { db } from "@/lib/db";
-import { notFound } from "next/navigation";
-import { TEMPLATES, TEMPLATE_COLORS, type TemplateId } from "@/lib/templates";
+"use client";
 
-export default async function SessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const session = await db.workoutSession.findUnique({
-    where: { id },
-    include: { exercises: { include: { sets: { orderBy: { setNumber: "asc" } } }, orderBy: { orderIndex: "asc" } } },
+import { use, useState, useEffect } from "react";
+import Link from "next/link";
+import { RecordedCompare } from "@/components/session/RecordedCompare";
+import PlannedSessionView from "@/components/session/PlannedSessionView";
+import { sessionLabel, type ApiSession } from "@/components/session/types";
+
+export default function SessionDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const [session, setSession] = useState<ApiSession | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const res = await globalThis.fetch(`/api/sessions/${id}`);
+        if (res.status === 404) {
+          setNotFound(true);
+        } else if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        } else {
+          const data = await res.json();
+          setSession(data);
+        }
+      } catch {
+        setNotFound(true);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadSession();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="h-8 bg-[var(--color-surface)] rounded-xl animate-pulse w-1/2" />
+        <div className="h-40 bg-[var(--color-surface)] rounded-xl animate-pulse" />
+      </div>
+    );
+  }
+
+  if (notFound || !session) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-[var(--color-text-faint)] mb-4">Session not found</p>
+        <Link href="/sessions" className="text-[var(--color-accent)] hover:underline text-sm">
+          ← Back to sessions
+        </Link>
+      </div>
+    );
+  }
+
+  const dateObj = new Date(`${session.date}T00:00:00`);
+  const formattedDate = dateObj.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
   });
 
-  if (!session) notFound();
+  if (session.phase === "recorded") {
+    return (
+      <div>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-[var(--color-text)] uppercase tracking-wide mb-2">
+            {session.name || sessionLabel(session.sessionType)}
+          </h2>
+          <p className="text-sm text-[var(--color-text-faint)]">{formattedDate}</p>
+        </div>
 
-  const label = TEMPLATES[session.template as TemplateId]?.label ?? session.template;
-  const colorClass = TEMPLATE_COLORS[session.template as TemplateId] ?? "bg-[var(--color-surface)] text-[var(--color-text-muted)]";
-  const totalVolume = session.exercises.reduce(
-    (acc, ex) => acc + ex.sets.reduce((a, s) => a + s.weightLbs * s.reps, 0),
-    0
-  );
+        {session.durationMin && (
+          <p className="text-sm text-[var(--color-text-faint)] mb-6">
+            {session.durationMin} min
+          </p>
+        )}
+
+        <div className="flex flex-col gap-2 mb-6">
+          <Link
+            href={`/sessions/${id}/record`}
+            className="min-h-[48px] px-4 py-3 rounded-xl bg-[var(--color-accent)] text-white font-medium text-sm hover:opacity-90 transition-opacity text-center"
+          >
+            Edit / add sets
+          </Link>
+          <Link
+            href={`/sessions/${id}/print`}
+            className="min-h-[48px] px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text)] font-medium text-sm hover:border-[var(--color-accent)] transition-colors text-center"
+          >
+            Print sheet
+          </Link>
+        </div>
+
+        <RecordedCompare session={session} />
+
+        <div className="mt-8">
+          <Link href="/sessions" className="text-sm text-[var(--color-text-faint)] hover:text-[var(--color-text)]">
+            ← Back to sessions
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-1">
-        <h2 className="text-2xl font-bold text-[var(--color-text)] uppercase tracking-wide">{label}</h2>
-        <span className={`text-xs font-bold px-3 py-1 ${colorClass}`}>{session.date}</span>
-        <span className={`text-xs font-bold px-2 py-0.5 uppercase tracking-wider ${session.phase === "recorded" ? "bg-[#0a1a0a] text-[#86efac]" : "bg-[#1a1000] text-[#fdba74]"}`}>
-          {session.phase === "recorded" ? "Recorded" : "Planned"}
-        </span>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-[var(--color-text)] uppercase tracking-wide mb-2">
+          {session.name || sessionLabel(session.sessionType)}
+        </h2>
+        <p className="text-sm text-[var(--color-text-faint)]">{formattedDate}</p>
       </div>
 
-      <div className="flex gap-4 text-sm text-[var(--color-text-faint)] mb-8">
-        {session.durationMin && <span>{session.durationMin} min</span>}
-        {totalVolume > 0 && <span>{Math.round(totalVolume).toLocaleString()} lbs total volume</span>}
-        {session.phase === "planned" && (
-          <Link href={`/sessions/${session.id}/record`} className="text-[var(--color-accent)] font-medium hover:underline">
-            Record this session →
-          </Link>
-        )}
-      </div>
-
-      {session.notes && (
-        <div className="bg-[#110a1a] border border-[#2a1a3a] p-4 mb-6">
-          <p className="text-xs font-bold text-[#c4b5fd] mb-1 uppercase tracking-widest">Coach Notes</p>
-          <p className="text-sm text-[#c4b5fd]">{session.notes}</p>
-        </div>
+      {session.durationMin && (
+        <p className="text-sm text-[var(--color-text-faint)] mb-6">
+          {session.durationMin} min
+        </p>
       )}
 
-      <div className="space-y-4">
-        {session.exercises.map((ex) => (
-          <div key={ex.id} className="bg-[var(--color-surface)] border border-[var(--color-border)] p-6">
-            <div className="flex items-start justify-between mb-1">
-              <h3 className="font-bold text-[var(--color-text)]">{ex.name}</h3>
-              <span className="text-xs text-[var(--color-text-faint)] bg-[var(--color-bg)] border border-[var(--color-border)] px-2 py-0.5">{ex.muscleGroups}</span>
-            </div>
-            <p className="text-xs text-[var(--color-text-faint)] mb-3">Target: {ex.targetSets} sets × {ex.targetReps} reps{ex.targetWeight ? ` @ ${ex.targetWeight} lbs` : ""}</p>
+      <PlannedSessionView session={session} />
 
-            {ex.aiNotes && <p className="text-xs text-[var(--color-text-faint)] italic mb-3">{ex.aiNotes}</p>}
-
-            {ex.sets.length > 0 ? (
-              <div className="flex gap-2 flex-wrap">
-                {ex.sets.map((s) => (
-                  <div key={s.id} className="text-center bg-[var(--color-bg)] border border-[var(--color-border)] px-3 py-2 min-w-[60px]">
-                    <p className="text-xs text-[var(--color-text-faint)] uppercase tracking-wider">Set {s.setNumber}</p>
-                    <p className="font-bold text-[var(--color-text)] text-sm">{s.weightLbs}<span className="text-xs font-normal"> lbs</span></p>
-                    <p className="text-xs text-[var(--color-text-muted)]">{s.reps} reps</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-[var(--color-text-faint)]">No sets recorded yet.</p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-6">
-        <Link href="/sessions" className="text-sm text-[var(--color-text-faint)] hover:text-[var(--color-text)]">← Back to sessions</Link>
+      <div className="mt-8">
+        <Link href="/sessions" className="text-sm text-[var(--color-text-faint)] hover:text-[var(--color-text)]">
+          ← Back to sessions
+        </Link>
       </div>
     </div>
   );
